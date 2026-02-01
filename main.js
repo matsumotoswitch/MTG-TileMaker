@@ -251,7 +251,6 @@ dropArea.addEventListener("drop", (e) => {
 function renderDropPreview() {
   dropArea.innerHTML = "";
 
-  // カードがない場合はメッセージを表示して終了
   if (droppedCards.length === 0) {
     dropArea.innerHTML = '<p style="color:#666; margin-top:20px;">ここにカードをドラッグ＆ドロップ</p>';
     return;
@@ -263,34 +262,24 @@ function renderDropPreview() {
   const userTotalWidth = parseInt(document.getElementById("totalWidth").value) || 0;
   const align = document.getElementById("align").value;
 
-  // コンテンツ自体の幅を計算
   const contentWidth = (columns * cardWidth) + ((columns - 1) * gap);
-  
-  // 出力画像幅の決定（指定幅かコンテンツ幅の大きい方）
   const finalCanvasWidth = Math.max(contentWidth, userTotalWidth);
 
-  // アートボードの作成
   const artboard = document.createElement("div");
   artboard.className = "artboard";
-  
-  // スタイル設定：指定された出力幅を物理的な枠として表示
   artboard.style.width = `${finalCanvasWidth}px`;
   artboard.style.display = "grid";
   artboard.style.gridTemplateColumns = `repeat(${columns}, ${cardWidth}px)`;
   artboard.style.gap = `${gap}px`;
   
-  // 横配置の設定 (left, center, right) を Grid の justify-content で実現
-  // CSSの値として start, center, end に変換
   const gridAlign = align === "left" ? "start" : align === "right" ? "end" : "center";
   artboard.style.justifyContent = gridAlign;
-
-  // 外枠（dropArea）自体の配置も合わせる
   dropArea.style.alignItems = align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
 
   droppedCards.forEach((url, idx) => {
     const card = document.createElement("div");
     card.className = "canvas-card";
-    card.draggable = true;
+    card.draggable = true; // 並び替えのためにドラッグ可能に
     card.style.width = `${cardWidth}px`;
 
     card.innerHTML = `
@@ -298,18 +287,41 @@ function renderDropPreview() {
       <button class="remove-btn" title="削除">×</button>
     `;
 
-    // 並び替えイベント
+    // --- 並び替え用イベントリスナー ---
+    
+    // ドラッグ開始: 自分のインデックスを保存
     card.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", idx);
-      card.style.opacity = "0.5";
+      e.dataTransfer.setData("text/move-idx", idx);
+      card.style.opacity = "0.4";
+      card.classList.add("moving");
     });
-    card.addEventListener("dragend", () => card.style.opacity = "1");
-    card.addEventListener("dragover", (e) => e.preventDefault());
+
+    card.addEventListener("dragend", () => {
+      card.style.opacity = "1";
+      card.classList.remove("moving");
+    });
+
+    // 重なった時: 並び替え可能であることを示す
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault(); // ドロップを許可
+      card.style.transform = "scale(1.05)";
+      card.style.zIndex = "10";
+    });
+
+    card.addEventListener("dragleave", () => {
+      card.style.transform = "scale(1)";
+      card.style.zIndex = "1";
+    });
+
+    // ドロップした時: 配列を入れ替えて再描画
     card.addEventListener("drop", (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      const fromIdx = e.dataTransfer.getData("text/plain");
-      if (fromIdx !== "") moveCard(parseInt(fromIdx), idx);
+      e.stopPropagation(); // 親（dropArea）の追加イベントを防ぐ
+      
+      const fromIdx = e.dataTransfer.getData("text/move-idx");
+      if (fromIdx !== "" && parseInt(fromIdx) !== idx) {
+        moveCard(parseInt(fromIdx), idx);
+      }
     });
 
     card.querySelector(".remove-btn").addEventListener("click", (e) => {
@@ -484,3 +496,4 @@ function updateSizeInfo() {
     });
   }
 });
+
