@@ -229,22 +229,21 @@ dropArea.addEventListener("drop", (e) => {
   e.preventDefault();
   dropArea.classList.remove("dragover");
 
+  // 並べ替え（再配置）の場合はここでは何もしない
+  if (e.dataTransfer.getData("text/reorder-idx")) return;
+
   const json = e.dataTransfer.getData("application/json");
-  if (!json) return;
-
-  const { url, w, h } = JSON.parse(json);
-
-  // 初回ドロップ時に基準サイズ確定
-  if (!baseImageSize) {
-    baseImageSize = {
-      w: Number(w),
-      h: Number(h)
-    };
+  if (json) {
+    try {
+      const { url, w, h } = JSON.parse(json);
+      if (!baseImageSize) baseImageSize = { w: Number(w), h: Number(h) };
+      droppedCards.push(url);
+      renderDropPreview();
+      updateSizeInfo();
+    } catch (err) {
+      console.error("JSON parse error", err);
+    }
   }
-
-  droppedCards.push(url);
-  renderDropPreview();
-  updateSizeInfo();
 });
 
 // 生成フィールドの並び替え（ドロップで順序入れ替え）
@@ -253,7 +252,7 @@ function renderDropPreview() {
 
   if (droppedCards.length === 0) {
     dropArea.innerHTML = '<p style="color:#666; margin-top:20px;">ここにカードをドラッグ＆ドロップ</p>';
-    baseImageSize = null; // カードが空になったら基準サイズをリセット
+    baseImageSize = null;
     return;
   }
 
@@ -282,33 +281,42 @@ function renderDropPreview() {
     card.className = "canvas-card";
     card.draggable = true;
     card.style.width = `${cardWidth}px`;
-    card.dataset.index = idx; // インデックスを保持
 
     card.innerHTML = `
       <img src="${url}" alt="card-${idx}" style="pointer-events: none;" />
-      <button class="remove-btn" style="pointer-events: auto;">×</button>
+      <button class="remove-btn">×</button>
     `;
 
-    // --- 並び替えイベント (カード単位) ---
+    // --- 並べ替えロジック ---
     card.addEventListener("dragstart", (e) => {
-      // 並び替えであることを明示するカスタム形式をセット
       e.dataTransfer.setData("text/reorder-idx", idx);
-      e.dataTransfer.effectAllowed = "move";
       card.style.opacity = "0.4";
     });
 
     card.addEventListener("dragover", (e) => {
-      e.preventDefault(); // ドロップ許可
-      e.dataTransfer.dropEffect = "move";
+      e.preventDefault(); // ここで許可しないとdropが発火しない
     });
 
     card.addEventListener("drop", (e) => {
       e.preventDefault();
-      e.stopPropagation(); // 親のdropAreaへのドロップを防ぐ
+      e.stopPropagation(); // これが重複防止に極めて重要
       
       const fromIdx = e.dataTransfer.getData("text/reorder-idx");
       if (fromIdx !== "" && parseInt(fromIdx) !== idx) {
-        moveCard(parseInt(fromIdx), idx);
+        // 並べ替え実行
+        const movedCard = droppedCards.splice(parseInt(fromIdx), 1)[0];
+        droppedCards.splice(idx, 0, movedCard);
+        renderDropPreview();
+        updateSizeInfo();
+      } else if (!fromIdx) {
+        // 新規カードをこの位置に挿入する場合の処理（オプション）
+        const json = e.dataTransfer.getData("application/json");
+        if (json) {
+          const { url } = JSON.parse(json);
+          droppedCards.splice(idx, 0, url);
+          renderDropPreview();
+          updateSizeInfo();
+        }
       }
     });
 
@@ -316,9 +324,10 @@ function renderDropPreview() {
       card.style.opacity = "1";
     });
 
-    card.querySelector(".remove-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      removeCard(idx);
+    card.querySelector(".remove-btn").addEventListener("click", () => {
+      droppedCards.splice(idx, 1);
+      renderDropPreview();
+      updateSizeInfo();
     });
 
     artboard.appendChild(card);
