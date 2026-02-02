@@ -499,3 +499,16 @@ select {
 .canvas-card .remove-btn {
   pointer-events: auto;
 }
+
+/* カード内の要素がイベントを遮らないようにする */
+.canvas-card {
+  cursor: grab;
+  user-select: none;
+}
+.canvas-card img {
+  pointer-events: none; /* 画像がドラッグの邪魔をしないように */
+}
+.canvas-card .remove-btn {
+  pointer-events: auto; /* ボタンは触れるように */
+}
+
