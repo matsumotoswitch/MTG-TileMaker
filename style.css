@@ -157,7 +157,7 @@ body {
 }
 
 /* ただし、削除ボタンだけはクリックできるようにする */
-#dropArea .canvas-card button {
+#dropArea . button {
   pointer-events: auto;
 }
 
@@ -261,16 +261,16 @@ body {
 }
 
 /* ドロップされた後のカード */
-.canvas-card {
+. {
   position: relative;
   width: 100%;
 }
-.canvas-card img {
+. img {
   width: 100%;
   border-radius: 4px;
   display: block;
 }
-.canvas-card button {
+. button {
   position: absolute;
   top: 5px;
   right: 5px;
@@ -478,4 +478,24 @@ select {
 .canvas-card.moving {
   border: 2px solid #ffd700;
   border-radius: 4px;
+}
+/* 並び替えをスムーズにする設定 */
+.canvas-card {
+  position: relative;
+  cursor: grab;
+  transition: transform 0.1s ease;
+}
+
+.canvas-card:active {
+  cursor: grabbing;
+}
+
+/* 重要：画像自体がマウスイベントを奪わないようにする */
+.canvas-card img {
+  pointer-events: none;
+}
+
+/* 削除ボタンは触れるようにする */
+.canvas-card .remove-btn {
+  pointer-events: auto;
 }
