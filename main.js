@@ -205,40 +205,47 @@ function renderDropPreview() {
   const alignSelect = document.getElementById("align");
   const align = alignSelect ? alignSelect.value : "center";
 
-  // コンテンツそのものの幅
+  // コンテンツそのものの計算幅
   const contentWidth = (columns * cardWidth) + ((columns - 1) * gap);
   
-  // 出力画像幅：設定値がコンテンツより小さい場合は、はみ出さないようコンテンツ幅を優先
+  // 出力画像幅の決定
   const finalCanvasWidth = Math.max(contentWidth, userTotalWidth);
 
-  // 1. アートボードの作成
+  // --- アートボードの作成 ---
   const artboard = document.createElement("div");
   artboard.className = "artboard";
   
-  // スタイル設定：ここがポイントです
+  // 枠の幅を厳密に固定
   artboard.style.display = "grid";
-  // 指定されたピクセル幅を強制的に適用
-  artboard.style.width = finalCanvasWidth + "px"; 
+  artboard.style.width = finalCanvasWidth + "px";
   artboard.style.minWidth = finalCanvasWidth + "px";
+  artboard.style.position = "relative"; // 配置の基準用
   
-  // カードの並び（列数と幅）を設定
+  // グリッド列の定義
   artboard.style.gridTemplateColumns = `repeat(${columns}, ${cardWidth}px)`;
   artboard.style.gap = gap + "px";
   
-  // 2. 配置設定（justify-content）
-  // カードが1枚でも、このプロパティによって artboard(枠) の中で移動します
+  // 横配置プロパティ
   const gridJustify = align === "left" ? "start" : align === "right" ? "end" : "center";
   artboard.style.justifyContent = gridJustify;
 
-  // 枠線の外観（style.cssの設定を上書き・補完）
+  // デザイン調整
   artboard.style.border = "1px solid #666";
   artboard.style.background = "#1a1a1a";
   artboard.style.boxSizing = "border-box";
 
-  // dropArea(親) の中でアートボード自体を中央に表示
+  // 外枠の中での中央配置
   dropArea.style.display = "flex";
   dropArea.style.justifyContent = "center";
   dropArea.style.alignItems = "flex-start";
+
+  // 【重要】透明なスペーサーの挿入
+  // これにより、カードが1枚でもGridが縮まず、finalCanvasWidthまで広がります
+  const spacer = document.createElement("div");
+  spacer.style.gridColumn = `1 / span ${columns}`;
+  spacer.style.height = "0";
+  spacer.style.width = "100%";
+  artboard.appendChild(spacer);
 
   droppedCards.forEach((url, idx) => {
     const card = document.createElement("div");
@@ -251,7 +258,7 @@ function renderDropPreview() {
       <button class="remove-btn">×</button>
     `;
 
-    // 並び替え・削除イベント（中略：現在のロジックを継承）
+    // 並び替え・削除イベント（ロジックは維持）
     card.addEventListener("dragstart", (e) => {
       e.dataTransfer.setData("text/reorder-idx", idx);
       card.style.opacity = "0.4";
@@ -395,5 +402,6 @@ function updateSizeInfo() {
     });
   }
 });
+
 
 
