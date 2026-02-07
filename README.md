@@ -1,2 +1,1 @@
-note用
-https://matsumotoswitch.github.io/mtg-tile-maker/
+https://matsumotoswitch.github.io/MTG-TileMaker/
