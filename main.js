@@ -38,7 +38,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   q += ` lang:${lang}`;
 
   let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=name`;
-  results.innerHTML = "";
+  results.innerHTML = "<p style='padding:10px; color:#ccc;'>検索中...</p>";
 
   // Scryfall APIからデータを取得（ページネーション対応）
   try {
@@ -49,6 +49,13 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
       if (!data.data) break;
       allCards = allCards.concat(data.data);
       url = data.has_more ? data.next_page : null;
+    }
+
+    results.innerHTML = "";
+
+    if (allCards.length === 0) {
+      results.innerHTML = "<p style='padding:10px; color:#ccc;'>該当するカードが見つかりませんでした。</p>";
+      return;
     }
 
     // 取得したカードを画面に表示
