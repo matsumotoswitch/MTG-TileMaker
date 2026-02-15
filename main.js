@@ -155,6 +155,14 @@ function renderLangButtons(el, langs, initialLang) {
 
   langArea.innerHTML = ""; // クリア
 
+  // マウスホイールで横スクロールできるようにする
+  langArea.addEventListener("wheel", (e) => {
+    if (e.deltaY) {
+      e.preventDefault();
+      langArea.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
+
   let currentLang = initialLang && langs[initialLang] ? initialLang : keys[0];
 
   const updateHighlight = () => {
