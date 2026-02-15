@@ -106,7 +106,19 @@ function addCardResult(card) {
   });
 
   // 他の言語版（プリント）を取得して切り替えボタンを生成
-  fetchAllPrints(card.prints_search_uri).then(printCards => {
+  let printsUri = card.prints_search_uri;
+  if (printsUri) {
+    try {
+      const u = new URL(printsUri);
+      const q = u.searchParams.get("q");
+      if (q) {
+        u.searchParams.set("q", q + " lang:any");
+        printsUri = u.toString();
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  fetchAllPrints(printsUri).then(printCards => {
     const langs = {};
     printCards.forEach(p => {
       const pUrl = getCardImageUrl(p);
@@ -133,7 +145,10 @@ async function fetchAllPrints(url) {
 // 言語切り替えボタンを描画し、クリックイベントを設定する
 function renderLangButtons(el, langs, initialLang) {
   const langArea = el.querySelector(".langArea");
-  const flagMap = { ja: "JP", en: "US", fr: "FR", de: "DE", es: "ES", it: "IT", pt: "PT", ru: "RU", ko: "KR", zh: "CN" };
+  const flagMap = { 
+    ja: "JP", en: "US", fr: "FR", de: "DE", es: "ES", it: "IT", pt: "PT", ru: "RU", ko: "KR", 
+    zhs: "CN", zht: "TW", ph: "Φ", he: "HE", la: "LA", grc: "GR", ar: "AR", sa: "SA" 
+  };
   const keys = Object.keys(langs);
   if (keys.length === 0) return;
 
