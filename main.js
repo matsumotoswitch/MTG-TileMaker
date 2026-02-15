@@ -146,35 +146,40 @@ async function fetchAllPrints(url) {
 function renderLangButtons(el, langs, initialLang) {
   const langArea = el.querySelector(".langArea");
   const flagMap = { 
-    ja: "JP", en: "US", fr: "FR", de: "DE", es: "ES", it: "IT", pt: "PT", ru: "RU", ko: "KR", 
+    ja: "JP", en: "EN", fr: "FR", de: "DE", es: "ES", it: "IT", pt: "PT", ru: "RU", ko: "KR", 
     zhs: "CN", zht: "TW", ph: "Φ", he: "HE", la: "LA", grc: "GR", ar: "AR", sa: "SA" 
   };
   const keys = Object.keys(langs);
   if (keys.length === 0) return;
 
-  let currentLang = initialLang && langs[initialLang] ? initialLang : keys[0];
+  // セレクトボックスの作成
+  const select = document.createElement("select");
+  select.className = "lang-select";
   
-  // ボタンのハイライト状態を更新する関数
-  const updateHighlight = () => {
-    langArea.querySelectorAll(".langBtn").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.lang === currentLang);
-    });
-  };
+  // ドラッグ開始を防ぐ
+  select.addEventListener("mousedown", (e) => e.stopPropagation());
+  select.addEventListener("click", (e) => e.stopPropagation());
+
+  // 言語切り替えイベント
+  select.addEventListener("change", (e) => {
+    const val = e.target.value;
+    if (langs[val]) {
+      el.querySelector("img").src = langs[val];
+    }
+  });
+
+  let currentLang = initialLang && langs[initialLang] ? initialLang : keys[0];
 
   keys.forEach(lang => {
-    const btn = document.createElement("button");
-    btn.className = "langBtn";
-    btn.textContent = flagMap[lang] || lang.toUpperCase();
-    btn.dataset.lang = lang;
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation(); // ドラッグ開始を防ぐ
-      el.querySelector("img").src = langs[lang];
-      currentLang = lang;
-      updateHighlight();
-    });
-    langArea.appendChild(btn);
+    const option = document.createElement("option");
+    option.value = lang;
+    option.textContent = flagMap[lang] || lang.toUpperCase();
+    if (lang === currentLang) option.selected = true;
+    select.appendChild(option);
   });
-  updateHighlight();
+
+  langArea.innerHTML = "";
+  langArea.appendChild(select);
 }
 
 // ドロップエリアのドラッグオーバー処理（スタイル変更）
