@@ -17,7 +17,36 @@ function detectLang(query) {
 }
 
 // カードオブジェクトから画像URLを取得（通常カードと両面カードに対応）
-function getCardImageUrl(card) {
+// queryが指定されている場合、その名前に一致する面を優先して返す
+function getCardImageUrl(card, query = null) {
+  // 両面カードで、かつ検索クエリがある場合、名前にマッチする面を探す
+  if (query && card.card_faces && card.card_faces.length > 1) {
+    const lowerQ = query.toLowerCase();
+    // マッチする面をすべて取得
+    const matchedFaces = card.card_faces.filter(face => {
+      return (face.name && face.name.toLowerCase().includes(lowerQ)) || (face.printed_name && face.printed_name.toLowerCase().includes(lowerQ));
+    });
+
+    if (matchedFaces.length > 0) {
+      // 優先度順にソート（完全一致 > 前方一致 > 部分一致）
+      matchedFaces.sort((a, b) => {
+        const getScore = (f) => {
+          const n = (f.name || "").toLowerCase();
+          const pn = (f.printed_name || "").toLowerCase();
+          if (n === lowerQ || pn === lowerQ) return 0; // 完全一致
+          if (n.startsWith(lowerQ) || pn.startsWith(lowerQ)) return 1; // 前方一致
+          return 2; // 部分一致
+        };
+        return getScore(a) - getScore(b);
+      });
+
+      const bestFace = matchedFaces[0];
+      if (bestFace.image_uris) {
+        return bestFace.image_uris.png || bestFace.image_uris.normal;
+      }
+    }
+  }
+
   if (card.image_uris) {
     return card.image_uris.png || card.image_uris.normal;
   } else if (card.card_faces && card.card_faces[0].image_uris) {
@@ -92,7 +121,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
 
     // 取得したカードを画面に表示
     allCards.forEach(card => {
-      addCardResult(card); // 整理された関数を呼び出す
+      addCardResult(card, query); // 検索クエリを渡して、一致する面を表示させる
     });
   } catch (e) {
     results.innerHTML = "<p>検索エラーが発生しました</p>";
@@ -100,65 +129,110 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
 });
 
 // 検索結果のカード要素を作成し、DOMに追加する
-function addCardResult(card) {
-  const imgUrl = getCardImageUrl(card);
-  if (!imgUrl) return;
+function addCardResult(card, query = null) {
+  // 表示対象のリストを作成（通常は1つだが、両面ともヒットした場合は複数になる）
+  let targets = [];
 
-  // カード要素のHTML構造を作成
-  const el = document.createElement("div");
-  el.className = "card-item";
-  el.draggable = true;
-  el.innerHTML = `
-    <img src="${imgUrl}" crossorigin="anonymous" style="width:100%; display:block; pointer-events:none;" />
-    <div class="card-overlay">
-      <div class="name">${card.name}</div>
-      <div class="size"></div>
-    </div>
-    <div class="card-footer">
-      <a class="card-link" href="${card.scryfall_uri}" target="_blank" title="Scryfallで詳細を見る">🌐</a>
-      <div class="langArea"></div>
-    </div>
-  `;
-  results.appendChild(el);
+  if (query && card.card_faces && card.card_faces.length > 1) {
+    const lowerQ = query.toLowerCase();
+    // 名前が一致する面をすべて探す
+    const matchedFaces = card.card_faces.filter(face => {
+      return (face.name && face.name.toLowerCase().includes(lowerQ)) || 
+             (face.printed_name && face.printed_name.toLowerCase().includes(lowerQ));
+    });
 
-  // 画像読み込み完了時にサイズ情報を取得して表示
-  const img = el.querySelector("img");
-  img.onload = () => {
-    el.dataset.w = img.naturalWidth;
-    el.dataset.h = img.naturalHeight;
-    el.querySelector(".size").textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
-  };
-
-  // ドラッグ開始時のデータ設定（画像URLとサイズ）
-  el.addEventListener("dragstart", (e) => {
-    // 現在の img.src (言語切り替え後も考慮) を渡す
-    e.dataTransfer.setData("application/json", JSON.stringify({
-      url: img.src, w: el.dataset.w, h: el.dataset.h
-    }));
-  });
-
-  // 他の言語版（プリント）を取得して切り替えボタンを生成
-  let printsUri = card.prints_search_uri;
-  if (printsUri) {
-    try {
-      const u = new URL(printsUri);
-      const q = u.searchParams.get("q");
-      if (q) {
-        u.searchParams.set("q", q + " lang:any");
-        printsUri = u.toString();
-      }
-    } catch (e) { console.error(e); }
+    if (matchedFaces.length > 0) {
+      matchedFaces.forEach(face => {
+        if (face.image_uris) {
+          targets.push({
+            imgUrl: face.image_uris.png || face.image_uris.normal,
+            displayName: face.printed_name || face.name,
+            faceIndex: card.card_faces.indexOf(face)
+          });
+        }
+      });
+    }
   }
 
-  fetchAllPrints(printsUri).then(printCards => {
-    const langs = {};
-    printCards.forEach(p => {
-      if (p.set !== card.set) return;
-      if (p.collector_number !== card.collector_number) return;
-      const pUrl = getCardImageUrl(p);
-      if (pUrl) langs[p.lang] = pUrl;
+  // マッチする面がない、または通常カードの場合（既存ロジック）
+  if (targets.length === 0) {
+    const imgUrl = getCardImageUrl(card, query);
+    if (imgUrl) {
+      targets.push({
+        imgUrl: imgUrl,
+        displayName: card.name,
+        faceIndex: -1
+      });
+    }
+  }
+
+  // 各ターゲットを描画
+  targets.forEach(target => {
+    const el = document.createElement("div");
+    el.className = "card-item";
+    el.draggable = true;
+    el.innerHTML = `
+      <img src="${target.imgUrl}" crossorigin="anonymous" style="width:100%; display:block; pointer-events:none;" />
+      <div class="card-overlay">
+        <div class="name">${target.displayName}</div>
+        <div class="size"></div>
+      </div>
+      <div class="card-footer">
+        <a class="card-link" href="${card.scryfall_uri}" target="_blank" title="Scryfallで詳細を見る">🌐</a>
+        <div class="langArea"></div>
+      </div>
+    `;
+    results.appendChild(el);
+
+    // 画像読み込み完了時にサイズ情報を取得して表示
+    const img = el.querySelector("img");
+    img.onload = () => {
+      el.dataset.w = img.naturalWidth;
+      el.dataset.h = img.naturalHeight;
+      el.querySelector(".size").textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+    };
+
+    // ドラッグ開始時のデータ設定（画像URLとサイズ）
+    el.addEventListener("dragstart", (e) => {
+      // 現在の img.src (言語切り替え後も考慮) を渡す
+      e.dataTransfer.setData("application/json", JSON.stringify({
+        url: img.src, w: el.dataset.w, h: el.dataset.h
+      }));
     });
-    renderLangButtons(el, langs, card.lang || "en");
+
+    // 他の言語版（プリント）を取得して切り替えボタンを生成
+    let printsUri = card.prints_search_uri;
+    if (printsUri) {
+      try {
+        const u = new URL(printsUri);
+        const q = u.searchParams.get("q");
+        if (q) {
+          u.searchParams.set("q", q + " lang:any");
+          printsUri = u.toString();
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    fetchAllPrints(printsUri).then(printCards => {
+      const langs = {};
+      printCards.forEach(p => {
+        if (p.set !== card.set) return;
+        if (p.collector_number !== card.collector_number) return;
+        
+        let pUrl = null;
+        // 特定の面を表示している場合は、他言語でもその面を探す
+        if (target.faceIndex >= 0 && p.card_faces && p.card_faces[target.faceIndex]) {
+           const f = p.card_faces[target.faceIndex];
+           if (f.image_uris) pUrl = f.image_uris.png || f.image_uris.normal;
+        } else {
+           // 通常カードまたはフォールバック
+           pUrl = getCardImageUrl(p);
+        }
+
+        if (pUrl) langs[p.lang] = pUrl;
+      });
+      renderLangButtons(el, langs, card.lang || "en");
+    });
   });
 }
 
