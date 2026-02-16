@@ -1,34 +1,64 @@
-// DOM要素の参照取得
-const results = document.getElementById("results");
-const dropArea = document.getElementById("dropArea");
+/**
+ * ============================================================================
+ * MTG-TileMaker Main Logic
+ * ============================================================================
+ */
 
-// 状態管理用変数
-let droppedCards = [];
-let baseImageSize = null;
+// ----------------------------------------------------------------------------
+// 1. Constants & DOM Elements
+// ----------------------------------------------------------------------------
+const API_DELAY_MS = 150;
 
-// 検索入力欄でEnterキーが押されたら検索を実行
-document.getElementById("searchInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("searchBtn").click();
-});
+const ui = {
+  results: document.getElementById("results"),
+  dropArea: document.getElementById("dropArea"),
+  searchInput: document.getElementById("searchInput"),
+  searchBtn: document.getElementById("searchBtn"),
+  generateBtn: document.getElementById("generateBtn"),
+  sizeInfo: document.getElementById("sizeInfo"),
+  settings: {
+    columns: document.getElementById("columns"),
+    cardWidth: document.getElementById("cardWidth"),
+    gap: document.getElementById("gap"),
+    totalWidth: document.getElementById("totalWidth"),
+    align: document.getElementById("align"),
+  }
+};
 
-// 検索クエリから言語を自動判定（日本語文字が含まれる場合は 'ja'、それ以外は 'en'）
+// ----------------------------------------------------------------------------
+// 2. State Management
+// ----------------------------------------------------------------------------
+let droppedCards = []; // Array<{ url: string, rotation: number }>
+let baseImageSize = null; // { w: number, h: number }
+
+// ----------------------------------------------------------------------------
+// 3. Utility Functions
+// ----------------------------------------------------------------------------
+
+/**
+ * 検索クエリから言語を自動判定
+ * @param {string} query
+ * @returns {'ja' | 'en'}
+ */
 function detectLang(query) {
   return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9faf]/.test(query) ? "ja" : "en";
 }
 
-// カードオブジェクトから画像URLを取得（通常カードと両面カードに対応）
-// queryが指定されている場合、その名前に一致する面を優先して返す
+/**
+ * カードオブジェクトから画像URLを取得
+ * @param {Object} card Scryfallカードオブジェクト
+ * @param {string|null} query 検索クエリ（一致する面を優先するため）
+ * @returns {string} 画像URL
+ */
 function getCardImageUrl(card, query = null) {
-  // 両面カードで、かつ検索クエリがある場合、名前にマッチする面を探す
+  // 両面カードかつクエリがある場合、名前にマッチする面を優先
   if (query && card.card_faces && card.card_faces.length > 1) {
     const lowerQ = query.toLowerCase();
-    // マッチする面をすべて取得
     const matchedFaces = card.card_faces.filter(face => {
       return (face.name && face.name.toLowerCase().includes(lowerQ)) || (face.printed_name && face.printed_name.toLowerCase().includes(lowerQ));
     });
 
     if (matchedFaces.length > 0) {
-      // 優先度順にソート（完全一致 > 前方一致 > 部分一致）
       matchedFaces.sort((a, b) => {
         const getScore = (f) => {
           const n = (f.name || "").toLowerCase();
@@ -47,6 +77,7 @@ function getCardImageUrl(card, query = null) {
     }
   }
 
+  // 通常の画像取得ロジック
   if (card.image_uris) {
     return card.image_uris.png || card.image_uris.normal;
   } else if (card.card_faces && card.card_faces[0].image_uris) {
@@ -55,12 +86,33 @@ function getCardImageUrl(card, query = null) {
   return "";
 }
 
-// APIリクエスト管理用キューと処理関数
-// Scryfall APIのレートリミット（平均10リクエスト/秒）を遵守するため、
-// リクエストを直列化し、間に150msの遅延を入れる
+/**
+ * 画像をロードする（CORS対応）
+ * @param {string} url
+ * @returns {Promise<HTMLImageElement>}
+ */
+function loadImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(img); // エラー時もresolveして処理を止めない
+    // キャッシュバスターを追加してCORSエラーを回避
+    img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 4. API Handling (Queue System)
+// ----------------------------------------------------------------------------
 const apiQueue = [];
 let isApiProcessing = false;
 
+/**
+ * Scryfall APIへのリクエストをキューに追加して実行
+ * @param {string} url
+ * @returns {Promise<Object>}
+ */
 function fetchScryfall(url) {
   return new Promise((resolve, reject) => {
     apiQueue.push({ url, resolve, reject });
@@ -68,6 +120,9 @@ function fetchScryfall(url) {
   });
 }
 
+/**
+ * APIキューを順次処理する
+ */
 async function processApiQueue() {
   if (isApiProcessing) return;
   isApiProcessing = true;
@@ -83,14 +138,19 @@ async function processApiQueue() {
       reject(e);
     }
     // 150msの遅延を入れる (50-100msの要求に対して余裕を持つ)
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, API_DELAY_MS));
   }
   isApiProcessing = false;
 }
 
+// 検索入力欄でEnterキーが押されたら検索を実行
+ui.searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") ui.searchBtn.click();
+});
+
 // 検索ボタンクリック時の処理
-document.getElementById("searchBtn").addEventListener("click", async () => {
-  const query = document.getElementById("searchInput").value.trim();
+ui.searchBtn.addEventListener("click", async () => {
+  const query = ui.searchInput.value.trim();
   const match = document.querySelector('input[name="match"]:checked').value;
   if (!query) return;
 
@@ -100,7 +160,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   q += ` lang:${lang}`;
 
   let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=name`;
-  results.innerHTML = "<p style='padding:10px; color:#ccc;'>検索中...</p>";
+  ui.results.innerHTML = "<p style='padding:10px; color:#ccc;'>検索中...</p>";
 
   // Scryfall APIからデータを取得（ページネーション対応）
   try {
@@ -112,10 +172,10 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
       url = data.has_more ? data.next_page : null;
     }
 
-    results.innerHTML = "";
+    ui.results.innerHTML = "";
 
     if (allCards.length === 0) {
-      results.innerHTML = "<p style='padding:10px; color:#ccc;'>該当するカードが見つかりませんでした。</p>";
+      ui.results.innerHTML = "<p style='padding:10px; color:#ccc;'>該当するカードが見つかりませんでした。</p>";
       return;
     }
 
@@ -124,7 +184,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
       addCardResult(card, query); // 検索クエリを渡して、一致する面を表示させる
     });
   } catch (e) {
-    results.innerHTML = "<p>検索エラーが発生しました</p>";
+    ui.results.innerHTML = "<p>検索エラーが発生しました</p>";
   }
 });
 
@@ -182,7 +242,7 @@ function addCardResult(card, query = null) {
         <div class="langArea"></div>
       </div>
     `;
-    results.appendChild(el);
+    ui.results.appendChild(el);
 
     // 画像読み込み完了時にサイズ情報を取得して表示
     const img = el.querySelector("img");
@@ -300,16 +360,16 @@ function renderLangButtons(el, langs, initialLang) {
 }
 
 // ドロップエリアのドラッグオーバー処理（スタイル変更）
-dropArea.addEventListener("dragover", (e) => {
+ui.dropArea.addEventListener("dragover", (e) => {
   e.preventDefault();
-  dropArea.classList.add("dragover");
+  ui.dropArea.classList.add("dragover");
 });
-dropArea.addEventListener("dragleave", () => dropArea.classList.remove("dragover"));
+ui.dropArea.addEventListener("dragleave", () => ui.dropArea.classList.remove("dragover"));
 
 // ドロップ処理：新規カードの追加または並び替え
-dropArea.addEventListener("drop", (e) => {
+ui.dropArea.addEventListener("drop", (e) => {
   e.preventDefault();
-  dropArea.classList.remove("dragover");
+  ui.dropArea.classList.remove("dragover");
   if (e.dataTransfer.getData("text/reorder-idx")) return;
 
   const json = e.dataTransfer.getData("application/json");
@@ -325,9 +385,9 @@ dropArea.addEventListener("drop", (e) => {
 // ドロップエリアの描画（プレビュー）
 // グリッドレイアウトの計算と、ドラッグによる並び替え機能を提供
 function renderDropPreview() {
-  dropArea.innerHTML = "";
+  ui.dropArea.innerHTML = "";
   if (droppedCards.length === 0) {
-    dropArea.innerHTML = '<p>ここにカードをドラッグ＆ドロップ</p>';
+    ui.dropArea.innerHTML = '<p>ここにカードをドラッグ＆ドロップ</p>';
     baseImageSize = null;
     return;
   }
@@ -339,8 +399,8 @@ function renderDropPreview() {
   const userTotalWidth = parseInt(document.getElementById("totalWidth").value) || 0;
   const align = document.getElementById("align").value;
 
-  dropArea.style.display = "block";
-  dropArea.style.padding = "10px";
+  ui.dropArea.style.display = "block";
+  ui.dropArea.style.padding = "10px";
 
   // アートボード（描画領域）の作成
   const artboard = document.createElement("div");
@@ -453,12 +513,12 @@ function renderDropPreview() {
 
   const finalCanvasWidth = userTotalWidth > 0 ? userTotalWidth : maxRowWidth;
   artboard.style.width = finalCanvasWidth + "px";
-  dropArea.appendChild(artboard);
+  ui.dropArea.appendChild(artboard);
 }
 
 // 画像生成とダウンロード処理
 // Canvasを使用してタイル状に画像を配置し、PNGとして出力する
-document.getElementById("generateBtn").addEventListener("click", async () => {
+ui.generateBtn.addEventListener("click", async () => {
   if (droppedCards.length === 0) return;
   const columns = parseInt(document.getElementById("columns").value);
   const cardWidth = parseInt(document.getElementById("cardWidth").value);
@@ -546,11 +606,10 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
 });
 
 // クリアボタンの追加とイベント設定
-const generateBtn = document.getElementById("generateBtn");
 const clearBtn = document.createElement("button");
 clearBtn.id = "clearBtn";
 clearBtn.textContent = "クリア";
-generateBtn.parentNode.insertBefore(clearBtn, generateBtn.nextSibling);
+ui.generateBtn.parentNode.insertBefore(clearBtn, ui.generateBtn.nextSibling);
 
 clearBtn.addEventListener("click", () => {
   if (droppedCards.length === 0) return;
@@ -560,16 +619,6 @@ clearBtn.addEventListener("click", () => {
   renderDropPreview();
   updateSizeInfo();
 });
-
-// 画像読み込みのヘルパー関数（CORS対応）
-function loadImage(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
-  });
-}
 
 // 出力予定サイズの情報を更新して表示する
 function updateSizeInfo() {
