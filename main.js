@@ -272,7 +272,6 @@ function renderDropPreview() {
   artboard.className = "artboard";
   // 幅は後で計算するか、行ごとに制御するためここではスタイルのみ
   artboard.style.border = "1px solid #666";
-  artboard.style.background = "#1a1a1a";
   artboard.style.padding = "0";
   artboard.style.display = "block"; // 行を積む
   
