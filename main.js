@@ -26,6 +26,39 @@ function getCardImageUrl(card) {
   return "";
 }
 
+// APIリクエスト管理用キューと処理関数
+// Scryfall APIのレートリミット（平均10リクエスト/秒）を遵守するため、
+// リクエストを直列化し、間に150msの遅延を入れる
+const apiQueue = [];
+let isApiProcessing = false;
+
+function fetchScryfall(url) {
+  return new Promise((resolve, reject) => {
+    apiQueue.push({ url, resolve, reject });
+    processApiQueue();
+  });
+}
+
+async function processApiQueue() {
+  if (isApiProcessing) return;
+  isApiProcessing = true;
+
+  while (apiQueue.length > 0) {
+    const { url, resolve, reject } = apiQueue.shift();
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      const data = await res.json();
+      resolve(data);
+    } catch (e) {
+      reject(e);
+    }
+    // 150msの遅延を入れる (50-100msの要求に対して余裕を持つ)
+    await new Promise(r => setTimeout(r, 150));
+  }
+  isApiProcessing = false;
+}
+
 // 検索ボタンクリック時の処理
 document.getElementById("searchBtn").addEventListener("click", async () => {
   const query = document.getElementById("searchInput").value.trim();
@@ -44,8 +77,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   try {
     let allCards = [];
     while (url) {
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await fetchScryfall(url);
       if (!data.data) break;
       allCards = allCards.concat(data.data);
       url = data.has_more ? data.next_page : null;
@@ -134,8 +166,7 @@ async function fetchAllPrints(url) {
   let all = [];
   let next = url;
   while (next) {
-    const res = await fetch(next);
-    const data = await res.json();
+    const data = await fetchScryfall(next);
     if (!data.data) break;
     all = all.concat(data.data);
     next = data.has_more ? data.next_page : null;
