@@ -441,6 +441,22 @@ body {
   height: 8px;
 }
 
+/* スクロールバーの通り道（背景） */
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+/* スクロールバーのつまみ（動く部分） */
+::-webkit-scrollbar-thumb {
+  background: #6b6659;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8e8877;
+}
+
 /* Firefox用の設定 */
 * {
   scrollbar-width: thin;
