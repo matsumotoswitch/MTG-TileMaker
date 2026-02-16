@@ -287,7 +287,9 @@ function renderDropPreview() {
     const rowDiv = document.createElement("div");
     rowDiv.style.display = "flex";
     rowDiv.style.gap = gap + "px";
-    rowDiv.style.marginBottom = gap + "px";
+    if (rowIdx < rows.length - 1) {
+      rowDiv.style.marginBottom = gap + "px";
+    }
     rowDiv.style.justifyContent = align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
     
     let currentRowWidth = 0;
@@ -527,7 +529,6 @@ function updateSizeInfo() {
   }
 
   const finalWidth = userTotalWidth > 0 ? userTotalWidth : maxWidth;
-  sizeInfo.textContent = `出力予定: ${finalWidth} × ${finalHeight}px`;
   sizeInfo.textContent = `出力予定: ${finalWidth} × ${totalHeight}px`;
 }
 
