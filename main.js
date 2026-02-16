@@ -438,6 +438,22 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
   link.click();
 });
 
+// クリアボタンの追加とイベント設定
+const generateBtn = document.getElementById("generateBtn");
+const clearBtn = document.createElement("button");
+clearBtn.id = "clearBtn";
+clearBtn.textContent = "クリア";
+generateBtn.parentNode.insertBefore(clearBtn, generateBtn.nextSibling);
+
+clearBtn.addEventListener("click", () => {
+  if (droppedCards.length === 0) return;
+  if (!confirm("配置したカードをすべて削除しますか？")) return;
+  droppedCards = [];
+  baseImageSize = null;
+  renderDropPreview();
+  updateSizeInfo();
+});
+
 // 画像読み込みのヘルパー関数（CORS対応）
 function loadImage(url) {
   return new Promise((resolve) => {

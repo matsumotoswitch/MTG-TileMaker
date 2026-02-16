@@ -30,42 +30,40 @@
     <!-- 右カラム -->
     <section class="right">
       <div class="settings">
-        <div class="setting-row">
-          <div class="setting">
-            <label>横枚数</label>
-            <input id="columns" type="number" value="3" min="1" />
-          </div>
-      
-          <div class="setting">
-            <label>カード幅(px)</label>
-            <input id="cardWidth" type="number" value="400" min="50" />
-          </div>
-      
-          <div class="setting">
-            <label>カード間隔(px)</label>
-            <input id="gap" type="number" value="10" min="0" />
-          </div>
+        <div class="setting">
+          <label>横枚数</label>
+          <input id="columns" type="number" value="3" min="1" />
+        </div>
+    
+        <div class="setting">
+          <label>カード幅(px)</label>
+          <input id="cardWidth" type="number" value="400" min="50" />
+        </div>
+    
+        <div class="setting">
+          <label>カード間隔(px)</label>
+          <input id="gap" type="number" value="10" min="0" />
         </div>
 
-        <div class="setting-row" style="margin-top: 10px;">
-          <div class="setting">
-            <label>出力画像幅(px)</label>
-            <input id="totalWidth" type="number" value="1240" placeholder="自動(最小)" min="1" />
-          </div>
+        <div class="setting">
+          <label>出力画像幅(px)</label>
+          <input id="totalWidth" type="number" value="1240" placeholder="自動" min="1" />
+        </div>
 
-          <div class="setting">
-            <label>横配置</label>
-            <select id="align">
-              <option value="center" selected>中央揃え</option>
-              <option value="left">左揃え</option>
-              <option value="right">右揃え</option>
-            </select>
-          </div>
+        <div class="setting">
+          <label>横配置</label>
+          <select id="align">
+            <option value="center" selected>中央揃え</option>
+            <option value="left">左揃え</option>
+            <option value="right">右揃え</option>
+          </select>
         </div>
 
         <div class="generate-box">
           <div id="sizeInfo"></div>
-          <button id="generateBtn">画像生成</button>
+          <div class="button-group">
+            <button id="generateBtn">画像生成</button>
+          </div>
         </div>
       </div>
 

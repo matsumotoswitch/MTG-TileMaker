@@ -67,8 +67,8 @@ body {
 }
 
 /* ボタン：高さを完全同期 */
-#searchBtn, #generateBtn {
-  min-width: 100px;
+#searchBtn, #generateBtn, #clearBtn {
+  width: 100px;
   height: 36px;
   padding: 0 16px;
   color: #ffffff;
@@ -87,22 +87,19 @@ body {
 }
 
 #searchBtn { background: linear-gradient(to bottom, #3a4b5b, #1e2b37); }
-#generateBtn { background: linear-gradient(to bottom, #7d5a2a, #4e3516); min-width: 120px; }
+#generateBtn { background: linear-gradient(to bottom, #7d5a2a, #4e3516); }
+#clearBtn { background: linear-gradient(to bottom, #8b0000, #500000); }
 
-#searchBtn:hover, #generateBtn:hover { filter: brightness(1.5); }
-#searchBtn:active, #generateBtn:active { transform: translate(1px, 1px); }
+#searchBtn:hover, #generateBtn:hover, #clearBtn:hover { filter: brightness(1.5); }
+#searchBtn:active, #generateBtn:active, #clearBtn:active { transform: translate(1px, 1px); }
 
 /* 出力設定エリア */
 .settings {
   flex-direction: row;
   align-items: flex-end;
-  justify-content: space-between;
-}
-
-.setting-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .setting {
@@ -116,7 +113,7 @@ body {
 
 .setting input[type="number"] {
   height: 36px;
-  width: 128px;
+  width: 120px;
   padding: 0 8px;
   background: #5a5852;
   color: #f5f3f0;
@@ -129,6 +126,19 @@ body {
   gap: 12px;
   margin-bottom: 8px;
   opacity: 0.9;
+}
+
+.generate-box {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
 }
 
 /* 検索結果・ドロップエリア */
