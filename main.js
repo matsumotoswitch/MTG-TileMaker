@@ -154,6 +154,7 @@ function addCardResult(card) {
     const langs = {};
     printCards.forEach(p => {
       if (p.set !== card.set) return;
+      if (p.collector_number !== card.collector_number) return;
       const pUrl = getCardImageUrl(p);
       if (pUrl) langs[p.lang] = pUrl;
     });
