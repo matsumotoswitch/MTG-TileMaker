@@ -251,41 +251,44 @@ select {
 
 .card-overlay {
   position: absolute;
-  left: 0; right: 0; bottom: 34px;
-  padding: 6px 10px;
+  left: 0; right: 0; bottom: 26px;
+  padding: 4px 8px 0 8px;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
   pointer-events: none;
   text-align: center;
-}
-
-.card-overlay .name {
-  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .card-overlay .name,
-.card-overlay .released,
+.card-overlay .set-name,
 .card-overlay .size {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.card-overlay .name {
+  font-weight: bold;
   font-size: 12px;
 }
 
-.card-overlay .set-info {
-  color: #ccc;
-  margin-top: 2px;
+.card-overlay .set-name {
+  color: #ddd;
 }
 
-.card-overlay .date-size {
-  color: #aaa;
-  margin-top: 1px;
+.card-overlay .size {
+  color: #ccc;
 }
 
 .card-footer {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 34px;
+  height: 26px;
   background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
@@ -298,6 +301,7 @@ select {
   text-decoration: none;
   font-weight: bold;
   padding-right: 8px;
+  font-size: 12px;
   pointer-events: auto;
 }
 

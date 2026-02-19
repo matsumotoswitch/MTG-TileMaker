@@ -235,6 +235,7 @@ function addCardResult(card, query = null) {
       <img src="${target.imgUrl}" crossorigin="anonymous" style="width:100%; display:block; pointer-events:none;" />
       <div class="card-overlay">
         <div class="name">${target.displayName}</div>
+      <div class="set-name">${card.set_name}</div>
         <div class="size"></div>
       </div>
       <div class="card-footer">
