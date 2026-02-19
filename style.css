@@ -75,14 +75,18 @@ img {
   outline: none;
 }
 
-select {
+select, .setting input[type="number"] {
   height: 36px;
+  width: 100px;
   padding: 0 8px;
   background: #5a5852;
   color: #f5f3f0;
   border: 1px solid #6c6a64;
   border-radius: 4px;
   outline: none;
+}
+
+select {
   cursor: pointer;
 }
 
@@ -127,16 +131,6 @@ select {
 
 .setting label {
   margin-bottom: 8px;
-}
-
-.setting input[type="number"] {
-  height: 36px;
-  width: 120px;
-  padding: 0 8px;
-  background: #5a5852;
-  color: #f5f3f0;
-  border: 1px solid #6c6a64;
-  border-radius: 4px;
 }
 
 .toggle-row { 
