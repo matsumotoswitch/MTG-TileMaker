@@ -90,6 +90,30 @@ select {
   cursor: pointer;
 }
 
+/* 単位を表示するためのラッパー */
+.input-wrapper {
+  position: relative;
+  width: 100px;
+}
+
+.setting .input-wrapper input[type="number"] {
+  width: 100%;
+  padding-right: 28px; /* 単位が被らないように右余白を確保 */
+}
+
+.input-wrapper::after {
+  content: attr(data-unit);
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: -2px;
+  color: #999;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
 #searchBtn, #generateBtn, #clearBtn {
   width: 100px;
   height: 36px;
@@ -172,7 +196,8 @@ select {
   background: #2a2824;
   display: flex;
   flex-direction: column;
-  align-items: center; /* 横配置のデフォルト（JSで上書き可） */
+  align-items: flex-start;
+  padding: 0px 8px;
   transition: all 0.2s;
 }
 

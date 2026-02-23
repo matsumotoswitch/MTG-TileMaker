@@ -32,22 +32,30 @@
       <div class="settings">
         <div class="setting">
           <label>横枚数</label>
-          <input id="columns" type="number" value="3" min="1" />
+          <div class="input-wrapper" data-unit="枚">
+            <input id="columns" type="number" value="3" min="1" />
+          </div>
         </div>
     
         <div class="setting">
           <label>カード幅</label>
-          <input id="cardWidth" type="number" value="400" min="50" />
+          <div class="input-wrapper" data-unit="px">
+            <input id="cardWidth" type="number" value="400" min="50" />
+          </div>
         </div>
     
         <div class="setting">
           <label>カード間隔</label>
-          <input id="gap" type="number" value="10" min="0" />
+          <div class="input-wrapper" data-unit="px">
+            <input id="gap" type="number" value="10" min="0" />
+          </div>
         </div>
 
         <div class="setting">
           <label>出力画像幅</label>
-          <input id="totalWidth" type="number" value="1240" placeholder="自動" min="1" />
+          <div class="input-wrapper" data-unit="px">
+            <input id="totalWidth" type="number" value="1240" placeholder="自動" min="1" />
+          </div>
         </div>
 
         <div class="setting">
