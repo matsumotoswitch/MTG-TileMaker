@@ -107,7 +107,6 @@ select {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  margin-top: -2px;
   color: #999;
   font-size: 16px;
   pointer-events: none;
