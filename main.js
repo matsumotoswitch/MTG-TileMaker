@@ -15,6 +15,9 @@ const ui = {
   searchInput: document.getElementById("searchInput"),
   searchBtn: document.getElementById("searchBtn"),
   generateBtn: document.getElementById("generateBtn"),
+  infoBtn: document.getElementById("infoBtn"),
+  infoModal: document.getElementById("infoModal"),
+  closeModalBtn: document.getElementById("closeModalBtn"),
   uploadBtn: document.getElementById("uploadBtn"),
   fileInput: document.getElementById("fileInput"),
   sizeInfo: document.getElementById("sizeInfo"),
@@ -750,4 +753,17 @@ function updateSizeInfo() {
   document.getElementById(id).addEventListener("input", () => {
     renderDropPreview(); updateSizeInfo();
   });
+});
+
+// インフォメーションモーダルの制御
+ui.infoBtn.addEventListener("click", () => {
+  ui.infoModal.classList.add("show");
+});
+ui.closeModalBtn.addEventListener("click", () => {
+  ui.infoModal.classList.remove("show");
+});
+ui.infoModal.addEventListener("click", (e) => {
+  if (e.target === ui.infoModal) {
+    ui.infoModal.classList.remove("show");
+  }
 });

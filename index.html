@@ -14,6 +14,7 @@
         <div class="toggle-row">
           <label><input type="radio" name="match" value="partial" checked /> 部分一致</label>
           <label><input type="radio" name="match" value="exact" /> 完全一致</label>
+          <button id="infoBtn" title="About">!</button>
         </div>
 
         <div class="search-input-group">
@@ -82,6 +83,20 @@
       </div>
     </section>
   </main>
+
+  <!-- インフォメーションモーダル -->
+  <div id="infoModal" class="modal-overlay">
+    <div class="modal-content">
+      <h3>MTG-TileMaker について</h3>
+      <p>
+        このコンテンツはファンコンテンツ・ポリシーに沿った非公式のファンコンテンツです。ウィザーズ社の認可/許諾は得ていません。題材の一部に、ウィザーズ・オブ・ザ・コースト社の財産を含んでいます。©Wizards of the Coast LLC.
+      </p>
+      <p>
+        カードデータおよび画像は <a href="https://scryfall.com/" target="_blank">Scryfall</a> によって提供されています。
+      </p>
+      <button id="closeModalBtn">閉じる</button>
+    </div>
+  </div>
 
   <script src="main.js"></script>
 </body>
