@@ -114,7 +114,7 @@ select {
   z-index: 1;
 }
 
-#searchBtn, #generateBtn, #clearBtn {
+#searchBtn, #generateBtn, #clearBtn, #uploadBtn {
   width: 100px;
   height: 36px;
   padding: 0 16px;
@@ -135,10 +135,11 @@ select {
 
 #searchBtn { background: linear-gradient(to bottom, #3a4b5b, #1e2b37); }
 #generateBtn { background: linear-gradient(to bottom, #7d5a2a, #4e3516); }
+#uploadBtn { background: linear-gradient(to bottom, #4a6b3a, #2e4424); }
 #clearBtn { background: linear-gradient(to bottom, #8b0000, #500000); }
 
-#searchBtn:hover, #generateBtn:hover, #clearBtn:hover { filter: brightness(1.5); }
-#searchBtn:active, #generateBtn:active, #clearBtn:active { transform: translate(1px, 1px); }
+#searchBtn:hover, #generateBtn:hover, #clearBtn:hover, #uploadBtn:hover { filter: brightness(1.5); }
+#searchBtn:active, #generateBtn:active, #clearBtn:active, #uploadBtn:active { transform: translate(1px, 1px); }
 
 .settings {
   flex-direction: row;

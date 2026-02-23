@@ -15,6 +15,8 @@ const ui = {
   searchInput: document.getElementById("searchInput"),
   searchBtn: document.getElementById("searchBtn"),
   generateBtn: document.getElementById("generateBtn"),
+  uploadBtn: document.getElementById("uploadBtn"),
+  fileInput: document.getElementById("fileInput"),
   sizeInfo: document.getElementById("sizeInfo"),
   settings: {
     columns: document.getElementById("columns"),
@@ -94,11 +96,15 @@ function getCardImageUrl(card, query = null) {
 function loadImage(url) {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    if (url.startsWith("data:")) {
+      img.src = url;
+    } else {
+      img.crossOrigin = "anonymous";
+      // キャッシュバスターを追加してCORSエラーを回避
+      img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
+    }
     img.onload = () => resolve(img);
     img.onerror = () => resolve(img); // エラー時もresolveして処理を止めない
-    // キャッシュバスターを追加してCORSエラーを回避
-    img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
   });
 }
 
@@ -371,17 +377,99 @@ ui.dropArea.addEventListener("dragleave", () => ui.dropArea.classList.remove("dr
 ui.dropArea.addEventListener("drop", (e) => {
   e.preventDefault();
   ui.dropArea.classList.remove("dragover");
+
+  // ファイルドロップの処理（画像アップロード）
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    handleFiles(e.dataTransfer.files);
+    return;
+  }
+
+  // 既存のカード移動・検索結果からのドロップ処理
   if (e.dataTransfer.getData("text/reorder-idx")) return;
 
   const json = e.dataTransfer.getData("application/json");
   if (json && !e.dataTransfer.getData("text/reorder-idx")) {
     const { url, w, h } = JSON.parse(json);
+    // 最初の1枚目のサイズを基準サイズとする
     if (!baseImageSize) baseImageSize = { w: Number(w), h: Number(h) };
     droppedCards.push({ url, rotation: 0 });
     renderDropPreview();
     updateSizeInfo();
   }
 });
+
+// 画像追加ボタンのクリックイベント
+ui.uploadBtn.addEventListener("click", () => {
+  ui.fileInput.click();
+});
+
+// ファイル選択時のイベント
+ui.fileInput.addEventListener("change", (e) => {
+  if (e.target.files && e.target.files.length > 0) {
+    handleFiles(e.target.files);
+    // 同じファイルを再度選択できるようにリセット
+    ui.fileInput.value = "";
+  }
+});
+
+// ファイル処理関数（読み込み -> 角丸加工 -> 追加）
+async function handleFiles(files) {
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+
+    try {
+      const rawUrl = await readFileAsDataURL(file);
+      const processedUrl = await processRoundCorners(rawUrl);
+      const img = await loadImage(processedUrl);
+
+      if (!baseImageSize) baseImageSize = { w: img.naturalWidth, h: img.naturalHeight };
+      
+      droppedCards.push({ url: processedUrl, rotation: 0 });
+    } catch (err) {
+      console.error("画像の読み込みに失敗しました:", err);
+    }
+  }
+  renderDropPreview();
+  updateSizeInfo();
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+}
+
+// 画像の四隅を透明にする（角丸加工）
+async function processRoundCorners(url) {
+  const img = await loadImage(url);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const radius = Math.round(img.naturalWidth * 0.045); // カード幅の約4.5%を半径とする
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(0, 0, canvas.width, canvas.height, radius);
+  } else {
+    // roundRect非対応ブラウザ用フォールバック
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(canvas.width - radius, 0);
+    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
+    ctx.lineTo(canvas.width, canvas.height - radius);
+    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
+    ctx.lineTo(radius, canvas.height);
+    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+  }
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(img, 0, 0);
+  return canvas.toDataURL("image/png");
+}
 
 // ドロップエリアの描画（プレビュー）
 // グリッドレイアウトの計算と、ドラッグによる並び替え機能を提供
