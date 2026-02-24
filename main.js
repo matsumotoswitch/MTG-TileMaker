@@ -445,32 +445,86 @@ function readFileAsDataURL(file) {
   });
 }
 
-// 画像の四隅を透明にする（角丸加工）
+// 画像の四隅を透明にする（白い背景を検知して除去）
 async function processRoundCorners(url) {
   const img = await loadImage(url);
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const radius = Math.round(img.naturalWidth * 0.045); // カード幅の約4.5%を半径とする
-  ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(0, 0, canvas.width, canvas.height, radius);
-  } else {
-    // roundRect非対応ブラウザ用フォールバック
-    ctx.moveTo(radius, 0);
-    ctx.lineTo(canvas.width - radius, 0);
-    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-    ctx.lineTo(canvas.width, canvas.height - radius);
-    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
-    ctx.lineTo(radius, canvas.height);
-    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
-    ctx.lineTo(0, radius);
-    ctx.quadraticCurveTo(0, 0, radius, 0);
-  }
-  ctx.closePath();
-  ctx.clip();
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  canvas.width = w;
+  canvas.height = h;
+
   ctx.drawImage(img, 0, 0);
+  
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+  const visited = new Uint8Array(w * h); // 訪問済みフラグ
+
+  // 許容する色の差と、白とみなす閾値
+  const tolerance = 40;
+  const whiteThreshold = 200;
+
+  const getIdx = (x, y) => (y * w + x) * 4;
+
+  // 指定座標から近似色を透明化する (Flood Fill)
+  const removeCornerColor = (startX, startY) => {
+    const startIdx = getIdx(startX, startY);
+    const r0 = data[startIdx];
+    const g0 = data[startIdx + 1];
+    const b0 = data[startIdx + 2];
+    const a0 = data[startIdx + 3];
+
+    // すでに透明、または白っぽくない場合は処理しない
+    if (a0 < 20) return;
+    if (r0 < whiteThreshold || g0 < whiteThreshold || b0 < whiteThreshold) return;
+
+    const queue = [[startX, startY]];
+    visited[startY * w + startX] = 1;
+
+    // 誤爆防止のため探索範囲を四隅付近（各辺の25%）に限定
+    const limitX = Math.floor(w * 0.25);
+    const limitY = Math.floor(h * 0.25);
+    const minX = (startX < w / 2) ? 0 : w - limitX;
+    const maxX = (startX < w / 2) ? limitX : w;
+    const minY = (startY < h / 2) ? 0 : h - limitY;
+    const maxY = (startY < h / 2) ? limitY : h;
+
+    while (queue.length > 0) {
+      const [cx, cy] = queue.shift();
+      const idx = getIdx(cx, cy);
+
+      // 色差チェック
+      if (Math.abs(data[idx] - r0) > tolerance || 
+          Math.abs(data[idx+1] - g0) > tolerance || 
+          Math.abs(data[idx+2] - b0) > tolerance) {
+        continue;
+      }
+
+      // 透明化
+      data[idx + 3] = 0;
+
+      // 4近傍探索
+      const neighbors = [[cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]];
+      for (const [nx, ny] of neighbors) {
+        if (nx >= minX && nx < maxX && ny >= minY && ny < maxY) {
+          const vIdx = ny * w + nx;
+          if (visited[vIdx] === 0) {
+            visited[vIdx] = 1;
+            queue.push([nx, ny]);
+          }
+        }
+      }
+    }
+  };
+
+  // 四隅に対して実行
+  removeCornerColor(0, 0);
+  removeCornerColor(w - 1, 0);
+  removeCornerColor(0, h - 1);
+  removeCornerColor(w - 1, h - 1);
+
+  ctx.putImageData(imageData, 0, 0);
   return canvas.toDataURL("image/png");
 }
 
@@ -665,7 +719,6 @@ ui.generateBtn.addEventListener("click", async () => {
     let currentX = (align === "center") ? (canvasWidth - row.width) / 2 : (align === "right") ? (canvasWidth - row.width) : 0;
     
     row.items.forEach(item => {
-      const radius = Math.round(cardWidth * 0.045);
       ctx.save();
       // 中心へ移動して回転
       const cx = currentX + item.w / 2;
@@ -679,9 +732,6 @@ ui.generateBtn.addEventListener("click", async () => {
       const drawW = (item.rotation / 90) % 2 !== 0 ? item.h : item.w;
       const drawH = (item.rotation / 90) % 2 !== 0 ? item.w : item.h;
 
-      ctx.beginPath();
-      ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, radius);
-      ctx.clip();
       ctx.drawImage(item.img, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
 
