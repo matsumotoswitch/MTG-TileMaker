@@ -77,7 +77,7 @@ img {
 
 select, .setting input[type="number"] {
   height: 36px;
-  width: 100px;
+  width: 110px;
   padding: 0 8px;
   background: #5a5852;
   color: #f5f3f0;
@@ -93,7 +93,7 @@ select {
 /* 単位を表示するためのラッパー */
 .input-wrapper {
   position: relative;
-  width: 100px;
+  width: 110px;
 }
 
 .setting .input-wrapper input[type="number"] {
