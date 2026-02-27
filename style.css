@@ -388,6 +388,38 @@ select {
   font-weight: bold;
 }
 
+.rotate-btn {
+  position: absolute;
+  bottom: 5px;
+  background: rgba(0, 123, 255, 0.8);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto !important;
+  z-index: 10;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.rotate-btn:hover {
+  background: #0056b3;
+  color: white;
+}
+
+.rotate-l {
+  left: 5px;
+}
+
+.rotate-r {
+  left: 35px;
+}
+
 /* ドロップ後のカードスタイル */
 .canvas-card {
   position: relative;
@@ -414,6 +446,9 @@ select {
 }
 
 .canvas-card .remove-btn {
+  pointer-events: auto;
+}
+.canvas-card .rotate-btn {
   pointer-events: auto;
 }
 

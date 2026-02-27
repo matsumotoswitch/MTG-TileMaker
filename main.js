@@ -602,7 +602,10 @@ function renderDropPreview() {
         <div style="width:100%; height:100%; overflow:hidden; position:relative;">
           <img src="${cardData.url}" style="position:absolute; left:50%; top:50%; width:${isRotated ? displayH : displayW}px; height:${isRotated ? displayW : displayH}px; transform:${imgTransform}; pointer-events:none;" />
         </div>
-        <button class="rotate-btn" title="右に90度回転" style="pointer-events:auto; position:absolute; bottom:5px; left:5px; z-index:10; background:rgba(0, 123, 255, 0.8); color:white; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+        <button class="rotate-btn rotate-l" title="左に90度回転">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+        </button>
+        <button class="rotate-btn rotate-r" title="右に90度回転">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
         </button>
         <button class="remove-btn" title="削除" style="pointer-events:auto; position:absolute; top:5px; right:5px; z-index:10; background:rgba(255,0,0,0.6); color:white; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px;">
@@ -643,7 +646,12 @@ function renderDropPreview() {
     };
 
     // 回転ボタン
-    card.querySelector(".rotate-btn").onclick = (e) => {
+    card.querySelector(".rotate-l").onclick = (e) => {
+      e.stopPropagation();
+      cardData.rotation = (cardData.rotation - 90) % 360;
+      renderDropPreview(); updateSizeInfo();
+    };
+    card.querySelector(".rotate-r").onclick = (e) => {
       e.stopPropagation();
       cardData.rotation = (cardData.rotation + 90) % 360;
       renderDropPreview(); updateSizeInfo();
