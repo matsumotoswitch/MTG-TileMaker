@@ -169,7 +169,7 @@ ui.searchBtn.addEventListener("click", async () => {
   q += ` lang:${lang}`;
 
   let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=name`;
-  ui.results.innerHTML = "<p style='padding:10px; color:#ccc;'>検索中...</p>";
+  ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px; color:#ccc;'>検索中...</p>";
 
   // Scryfall APIからデータを取得（ページネーション対応）
   try {
@@ -184,7 +184,7 @@ ui.searchBtn.addEventListener("click", async () => {
     ui.results.innerHTML = "";
 
     if (allCards.length === 0) {
-      ui.results.innerHTML = "<p style='padding:10px; color:#ccc;'>該当するカードが見つかりませんでした。</p>";
+      ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px; color:#ccc;'>該当するカードが見つかりませんでした。</p>";
       return;
     }
 
@@ -193,7 +193,7 @@ ui.searchBtn.addEventListener("click", async () => {
       addCardResult(card, query); // 検索クエリを渡して、一致する面を表示させる
     });
   } catch (e) {
-    ui.results.innerHTML = "<p>検索エラーが発生しました</p>";
+    ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px;'>検索エラーが発生しました</p>";
   }
 });
 
