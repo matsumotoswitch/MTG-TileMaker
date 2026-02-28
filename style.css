@@ -265,11 +265,6 @@ select {
   pointer-events: none;
 }
 
-/* ただし、削除ボタンだけはクリックできるようにする */
-#dropArea .button {
-  pointer-events: auto;
-}
-
 /* ドラッグオーバー時の視覚効果 */
 #dropArea.dragover {
   background: #3e3a32 !important;
@@ -415,19 +410,19 @@ select {
   position: absolute;
   top: 5px;
   right: 5px;
-  background: rgba(255, 0, 0, 0.8);
+  background: rgba(255, 0, 0, 0.6);
   color: white;
   border: none;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: auto !important;
   z-index: 10;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: bold;
 }
 
@@ -487,14 +482,6 @@ select {
   border-radius: 0; /* 出力画像用なので角丸なし */
   pointer-events: none;
 }
-
-.canvas-card .remove-btn {
-  pointer-events: auto;
-}
-.canvas-card .rotate-btn {
-  pointer-events: auto;
-}
-
 /* ==========================================================================
    7. UI Components (Language Selector, etc.)
    ========================================================================== */
