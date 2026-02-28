@@ -165,7 +165,7 @@ select {
 }
 
 #infoBtn {
-  margin-left: auto;
+  margin-left: 0;
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -180,6 +180,30 @@ select {
   padding: 0;
 }
 #infoBtn:hover { background: #555; color: #fff; border-color: #fff; }
+
+.push-right {
+  margin-left: auto;
+}
+
+.icon-link {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+}
+
+.icon-link img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid #888;
+  transition: transform 0.2s;
+}
+
+.icon-link:hover img {
+  transform: scale(1.1);
+  border-color: #fff;
+}
 
 .generate-box {
   margin-left: auto;
