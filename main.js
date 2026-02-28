@@ -1,12 +1,13 @@
 /**
  * ============================================================================
- * MTG-TileMaker Main Logic
+ * MTG-TileMaker メインロジック
  * ============================================================================
  */
 
 // ----------------------------------------------------------------------------
-// 1. Constants & DOM Elements
+// 1. 定数とDOM要素
 // ----------------------------------------------------------------------------
+// Scryfall APIへの過度なアクセスを防ぐため、リクエスト間にランダムな遅延(100-150ms)を設ける
 const getRandomDelay = () => Math.floor(Math.random() * 51) + 100;
 
 const ui = {
@@ -31,17 +32,19 @@ const ui = {
 };
 
 // ----------------------------------------------------------------------------
-// 2. State Management
+// 2. 状態管理
 // ----------------------------------------------------------------------------
+// ドロップされたカードのリスト。回転状態もここで管理する
 let droppedCards = []; // Array<{ url: string, rotation: number }>
+// 最初にドロップされた画像のサイズを基準とし、以降の画像のアスペクト比計算に使用する
 let baseImageSize = null; // { w: number, h: number }
 
 // ----------------------------------------------------------------------------
-// 3. Utility Functions
+// 3. ユーティリティ関数
 // ----------------------------------------------------------------------------
 
 /**
- * 検索クエリから言語を自動判定
+ * 検索クエリに日本語が含まれているか判定し、Scryfallのlangパラメータを決定する
  * @param {string} query
  * @returns {'ja' | 'en'}
  */
@@ -51,12 +54,12 @@ function detectLang(query) {
 
 /**
  * カードオブジェクトから画像URLを取得
- * @param {Object} card Scryfallカードオブジェクト
- * @param {string|null} query 検索クエリ（一致する面を優先するため）
+ * 両面カードの場合、検索クエリに一致する面を優先して返すロジックを含む
+ * @param {Object} card Scryfall APIから返却されたカードオブジェクト
+ * @param {string|null} query 検索クエリ
  * @returns {string} 画像URL
  */
 function getCardImageUrl(card, query = null) {
-  // 両面カードかつクエリがある場合、名前にマッチする面を優先
   if (query && card.card_faces && card.card_faces.length > 1) {
     const lowerQ = query.toLowerCase();
     const matchedFaces = card.card_faces.filter(face => {
@@ -64,6 +67,7 @@ function getCardImageUrl(card, query = null) {
     });
 
     if (matchedFaces.length > 0) {
+      // 完全一致 > 前方一致 > 部分一致 の順でスコアリングし、最も適切な面を選択
       matchedFaces.sort((a, b) => {
         const getScore = (f) => {
           const n = (f.name || "").toLowerCase();
@@ -82,7 +86,6 @@ function getCardImageUrl(card, query = null) {
     }
   }
 
-  // 通常の画像取得ロジック
   if (card.image_uris) {
     return card.image_uris.png || card.image_uris.normal;
   } else if (card.card_faces && card.card_faces[0].image_uris) {
@@ -92,7 +95,7 @@ function getCardImageUrl(card, query = null) {
 }
 
 /**
- * 画像をロードする（CORS対応）
+ * 画像をロードし、Canvasで操作可能にするためにCORS設定を行う
  * @param {string} url
  * @returns {Promise<HTMLImageElement>}
  */
@@ -103,17 +106,18 @@ function loadImage(url) {
       img.src = url;
     } else {
       img.crossOrigin = "anonymous";
-      // キャッシュバスターを追加してCORSエラーを回避
+      // ブラウザのキャッシュがCORSヘッダーを含まない場合があるため、タイムスタンプでキャッシュを回避
       img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
     }
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(img); // エラー時もresolveして処理を止めない
+    img.onerror = () => resolve(img); // 画像生成プロセス全体を止めないよう、エラー時もresolveする
   });
 }
 
 // ----------------------------------------------------------------------------
-// 4. API Handling (Queue System)
+// 4. API処理（キューシステム）
 // ----------------------------------------------------------------------------
+// APIリクエストを直列化して実行するためのキュー
 const apiQueue = [];
 let isApiProcessing = false;
 
@@ -130,7 +134,7 @@ function fetchScryfall(url) {
 }
 
 /**
- * APIキューを順次処理する
+ * キューに積まれたリクエストを1つずつ処理し、完了ごとに遅延を入れる
  */
 async function processApiQueue() {
   if (isApiProcessing) return;
@@ -146,7 +150,6 @@ async function processApiQueue() {
     } catch (e) {
       reject(e);
     }
-    // サーバー負荷軽減のためランダムな遅延を入れる
     await new Promise(r => setTimeout(r, getRandomDelay()));
   }
   isApiProcessing = false;
@@ -163,15 +166,16 @@ ui.searchBtn.addEventListener("click", async () => {
   const match = document.querySelector('input[name="match"]:checked').value;
   if (!query) return;
 
-  // 言語判定と検索クエリの構築
   const lang = detectLang(query);
+  // Scryfallの検索構文: 完全一致の場合は "!" を付与
   let q = (match === "exact") ? `!${query}` : query;
   q += ` lang:${lang}`;
 
+  // unique=prints: 同名カードでもセット違いなどを全て取得する
   let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=name`;
   ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px; color:#ccc;'>検索中...</p>";
 
-  // Scryfall APIからデータを取得（ページネーション対応）
+  // ページネーションを辿って全件取得する
   try {
     let allCards = [];
     while (url) {
@@ -188,9 +192,8 @@ ui.searchBtn.addEventListener("click", async () => {
       return;
     }
 
-    // 取得したカードを画面に表示
     allCards.forEach(card => {
-      addCardResult(card, query); // 検索クエリを渡して、一致する面を表示させる
+      addCardResult(card, query);
     });
   } catch (e) {
     ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px;'>検索エラーが発生しました</p>";
@@ -199,12 +202,11 @@ ui.searchBtn.addEventListener("click", async () => {
 
 // 検索結果のカード要素を作成し、DOMに追加する
 function addCardResult(card, query = null) {
-  // 表示対象のリストを作成（通常は1つだが、両面ともヒットした場合は複数になる）
+  // 両面カードの場合、検索クエリにヒットした面を個別にリストアップする
   let targets = [];
 
   if (query && card.card_faces && card.card_faces.length > 1) {
     const lowerQ = query.toLowerCase();
-    // 名前が一致する面をすべて探す
     const matchedFaces = card.card_faces.filter(face => {
       return (face.name && face.name.toLowerCase().includes(lowerQ)) || 
              (face.printed_name && face.printed_name.toLowerCase().includes(lowerQ));
@@ -223,7 +225,7 @@ function addCardResult(card, query = null) {
     }
   }
 
-  // マッチする面がない、または通常カードの場合（既存ロジック）
+  // 通常カード、または特定の面マッチがない場合のフォールバック
   if (targets.length === 0) {
     const imgUrl = getCardImageUrl(card, query);
     if (imgUrl) {
@@ -235,7 +237,6 @@ function addCardResult(card, query = null) {
     }
   }
 
-  // 各ターゲットを描画
   targets.forEach(target => {
     const el = document.createElement("div");
     el.className = "card-item";
@@ -254,7 +255,7 @@ function addCardResult(card, query = null) {
     `;
     ui.results.appendChild(el);
 
-    // 画像読み込み完了時にサイズ情報を取得して表示
+    // 画像本来のサイズを取得し、オーバーレイに表示
     const img = el.querySelector("img");
     img.onload = () => {
       el.dataset.w = img.naturalWidth;
@@ -262,15 +263,14 @@ function addCardResult(card, query = null) {
       el.querySelector(".size").textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
     };
 
-    // ドラッグ開始時のデータ設定（画像URLとサイズ）
+    // ドロップ先に渡すデータ。言語切り替え後のURLに対応するため img.src を使用
     el.addEventListener("dragstart", (e) => {
-      // 現在の img.src (言語切り替え後も考慮) を渡す
       e.dataTransfer.setData("application/json", JSON.stringify({
         url: img.src, w: el.dataset.w, h: el.dataset.h
       }));
     });
 
-    // 他の言語版（プリント）を取得して切り替えボタンを生成
+    // 他言語版の検索URLを構築 (prints_search_uri はデフォルトで英語のみの場合があるため lang:any を付与)
     let printsUri = card.prints_search_uri;
     if (printsUri) {
       try {
@@ -283,6 +283,7 @@ function addCardResult(card, query = null) {
       } catch (e) { console.error(e); }
     }
 
+    // 非同期で他言語版を取得し、ボタンを生成
     fetchAllPrints(printsUri).then(printCards => {
       const langs = {};
       printCards.forEach(p => {
@@ -290,13 +291,11 @@ function addCardResult(card, query = null) {
         if (p.collector_number !== card.collector_number) return;
         
         let pUrl = null;
-        // 特定の面を表示している場合は、他言語でもその面を探す
         if (target.faceIndex >= 0 && p.card_faces && p.card_faces[target.faceIndex]) {
            const f = p.card_faces[target.faceIndex];
            if (f.image_uris) pUrl = f.image_uris.png || f.image_uris.normal;
         } else {
-           // 通常カードまたはフォールバック
-           pUrl = getCardImageUrl(p);
+           pUrl = getCardImageUrl(p); // 通常カード
         }
 
         if (pUrl) langs[p.lang] = pUrl;
@@ -306,7 +305,7 @@ function addCardResult(card, query = null) {
   });
 }
 
-// 指定されたURLから全ページのデータを取得するヘルパー関数
+// Scryfallのページネーションを処理して全データを取得する
 async function fetchAllPrints(url) {
   let all = [];
   let next = url;
@@ -319,7 +318,7 @@ async function fetchAllPrints(url) {
   return all;
 }
 
-// 言語切り替えボタンを描画し、クリックイベントを設定する
+// 言語切り替えボタンのUI生成
 function renderLangButtons(el, langs, initialLang) {
   const langArea = el.querySelector(".langArea");
   const flagMap = { 
@@ -331,7 +330,7 @@ function renderLangButtons(el, langs, initialLang) {
 
   langArea.innerHTML = ""; // クリア
 
-  // マウスホイールで横スクロールできるようにする
+  // 横スクロール操作の補助
   langArea.addEventListener("wheel", (e) => {
     if (e.deltaY) {
       e.preventDefault();
@@ -353,7 +352,7 @@ function renderLangButtons(el, langs, initialLang) {
     btn.textContent = flagMap[lang] || lang.toUpperCase();
     btn.dataset.lang = lang;
     
-    // ドラッグ開始を防ぐ
+    // ボタンクリック時にカード自体のドラッグが始まらないようにする
     btn.addEventListener("mousedown", (e) => e.stopPropagation());
     btn.onclick = (e) => {
       e.stopPropagation();
@@ -369,7 +368,6 @@ function renderLangButtons(el, langs, initialLang) {
   updateHighlight();
 }
 
-// ドロップエリアのドラッグオーバー処理（スタイル変更）
 ui.dropArea.addEventListener("dragover", (e) => {
   e.preventDefault();
   ui.dropArea.classList.add("dragover");
@@ -381,19 +379,19 @@ ui.dropArea.addEventListener("drop", (e) => {
   e.preventDefault();
   ui.dropArea.classList.remove("dragover");
 
-  // ファイルドロップの処理（画像アップロード）
+  // ローカルファイル（画像）のドロップ処理
   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
     handleFiles(e.dataTransfer.files);
     return;
   }
 
-  // 既存のカード移動・検索結果からのドロップ処理
+  // 内部での並び替え（reorder-idxがある場合）はここでは処理せず、各カードのdropイベントで処理する
   if (e.dataTransfer.getData("text/reorder-idx")) return;
 
+  // 検索結果からの新規ドロップ
   const json = e.dataTransfer.getData("application/json");
   if (json && !e.dataTransfer.getData("text/reorder-idx")) {
     const { url, w, h } = JSON.parse(json);
-    // 最初の1枚目のサイズを基準サイズとする
     if (!baseImageSize) baseImageSize = { w: Number(w), h: Number(h) };
     droppedCards.push({ url, rotation: 0 });
     renderDropPreview();
@@ -415,7 +413,7 @@ ui.fileInput.addEventListener("change", (e) => {
   }
 });
 
-// ファイル処理関数（読み込み -> 角丸加工 -> 追加）
+// ローカル画像を読み込み、角丸の透過処理を行ってからリストに追加する
 async function handleFiles(files) {
   for (const file of files) {
     if (!file.type.startsWith("image/")) continue;
@@ -445,7 +443,7 @@ function readFileAsDataURL(file) {
   });
 }
 
-// 画像の四隅を透明にする（白い背景を検知して除去）
+// 画像の四隅にある白い背景色を検知し、Flood Fillアルゴリズムで透明化する
 async function processRoundCorners(url) {
   const img = await loadImage(url);
   const canvas = document.createElement("canvas");
@@ -461,13 +459,12 @@ async function processRoundCorners(url) {
   const data = imageData.data;
   const visited = new Uint8Array(w * h); // 訪問済みフラグ
 
-  // 許容する色の差と、白とみなす閾値
-  const tolerance = 40;
-  const whiteThreshold = 200;
+  const tolerance = 40; // 色の許容差
+  const whiteThreshold = 200; // 白とみなす輝度の閾値
 
   const getIdx = (x, y) => (y * w + x) * 4;
 
-  // 指定座標から近似色を透明化する (Flood Fill)
+  // 指定座標(x,y)を起点に、色が近い領域を塗りつぶす（透明にする）
   const removeCornerColor = (startX, startY) => {
     const startIdx = getIdx(startX, startY);
     const r0 = data[startIdx];
@@ -475,14 +472,14 @@ async function processRoundCorners(url) {
     const b0 = data[startIdx + 2];
     const a0 = data[startIdx + 3];
 
-    // すでに透明、または白っぽくない場合は処理しない
+    // 起点がすでに透明、または白っぽくない場合は処理をスキップ
     if (a0 < 20) return;
     if (r0 < whiteThreshold || g0 < whiteThreshold || b0 < whiteThreshold) return;
 
     const queue = [[startX, startY]];
     visited[startY * w + startX] = 1;
 
-    // 誤爆防止のため探索範囲を四隅付近（各辺の25%）に限定
+    // カード内部の白領域まで消さないよう、探索範囲を四隅付近（各辺の25%）に制限する
     const limitX = Math.floor(w * 0.25);
     const limitY = Math.floor(h * 0.25);
     const minX = (startX < w / 2) ? 0 : w - limitX;
@@ -518,7 +515,7 @@ async function processRoundCorners(url) {
     }
   };
 
-  // 四隅に対して実行
+  // 四隅それぞれに対して処理を実行
   removeCornerColor(0, 0);
   removeCornerColor(w - 1, 0);
   removeCornerColor(0, h - 1);
@@ -529,7 +526,7 @@ async function processRoundCorners(url) {
 }
 
 /**
- * ドロップされたカードのレイアウトを計算する
+ * 現在のカードリストと設定値に基づいて、キャンバス上の配置座標とサイズを計算する
  * @returns {object|null} 計算されたレイアウト情報、またはカードがない場合はnull
  */
 function calculateLayout() {
@@ -537,7 +534,6 @@ function calculateLayout() {
     return null;
   }
 
-  // 設定値の取得
   const columns = parseInt(ui.settings.columns.value) || 1;
   const cardWidth = parseInt(ui.settings.cardWidth.value) || 200;
   const gap = parseInt(ui.settings.gap.value) || 0;
@@ -545,7 +541,7 @@ function calculateLayout() {
   const align = ui.settings.align.value;
   const ratio = baseImageSize.h / baseImageSize.w;
 
-  // 行ごとに分割
+  // カードリストを指定列数で分割して行を作成
   const cardRows = [];
   for (let i = 0; i < droppedCards.length; i += columns) {
     cardRows.push(droppedCards.slice(i, i + columns));
@@ -556,6 +552,7 @@ function calculateLayout() {
     let rowW = 0;
     let rowH = 0;
     const items = row.map(card => {
+      // 90度回転している場合、幅と高さの比率を入れ替えて計算する
       const isRotated = (card.rotation / 90) % 2 !== 0;
       const w = Math.round(isRotated ? cardWidth * ratio : cardWidth);
       const h = Math.round(isRotated ? cardWidth : cardWidth * ratio);
@@ -579,6 +576,7 @@ function calculateLayout() {
   };
 }
 
+// プレビュー画面（ドロップエリア）の描画
 function renderDropPreview() {
   ui.dropArea.innerHTML = "";
   const layout = calculateLayout();
@@ -622,6 +620,7 @@ function renderDropPreview() {
       card.style.width = displayW + "px";
       card.style.height = displayH + "px";
 
+      // 画像自体の回転処理（CSS transform）
       const imgTransform = `translate(-50%, -50%) rotate(${cardData.rotation}deg)`;
       const imgW = isRotated ? displayH : displayW;
       const imgH = isRotated ? displayW : displayH;
@@ -639,11 +638,13 @@ function renderDropPreview() {
         <button class="remove-btn" title="削除">×</button>
       `;
 
+      // ドラッグ＆ドロップによる並び替え処理
       card.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("text/reorder-idx", idx);
         card.style.opacity = "0.4";
       });
       card.addEventListener("dragover", (e) => e.preventDefault());
+      
       card.addEventListener("drop", (e) => {
         e.preventDefault(); e.stopPropagation();
         const fromIdx = e.dataTransfer.getData("text/reorder-idx");
@@ -651,6 +652,7 @@ function renderDropPreview() {
           const item = droppedCards.splice(parseInt(fromIdx), 1)[0];
           droppedCards.splice(idx, 0, item);
           renderDropPreview(); updateSizeInfo();
+        // 新規ドロップがカード上に落ちた場合の挿入処理
         } else if (!fromIdx) {
           const json = e.dataTransfer.getData("application/json");
           if (json) {
@@ -688,8 +690,7 @@ function renderDropPreview() {
   ui.dropArea.appendChild(artboard);
 }
 
-// 画像生成とダウンロード処理
-// Canvasを使用してタイル状に画像を配置し、PNGとして出力する
+// 最終的な画像を生成してダウンロードする
 ui.generateBtn.addEventListener("click", async () => {
   const layout = calculateLayout();
   if (!layout) return;
@@ -697,7 +698,7 @@ ui.generateBtn.addEventListener("click", async () => {
   const { rows, totalHeight, finalCanvasWidth, settings } = layout;
   const { gap, align } = settings;
 
-  // 全画像の読み込みを待機（サーバー負荷軽減のため順次処理と遅延）
+  // 高解像度画像を順次取得（サーバー負荷軽減のため遅延を入れる）
   const imgs = [];
   for (const c of droppedCards) {
     imgs.push(await loadImage(c.url));
@@ -722,9 +723,11 @@ ui.generateBtn.addEventListener("click", async () => {
       const cx = currentX + item.w / 2;
       const cy = currentY + item.h / 2;
       ctx.translate(cx, cy);
+      // Canvasコンテキストを回転させて描画
       ctx.rotate(item.rotation * Math.PI / 180);
       
       const isRotated = (item.rotation / 90) % 2 !== 0;
+      // 回転している場合、描画する画像の幅と高さを入れ替える必要がある
       const drawW = isRotated ? item.h : item.w;
       const drawH = isRotated ? item.w : item.h;
 
