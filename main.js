@@ -778,7 +778,7 @@ clearBtn.addEventListener("click", () => {
 function updateSizeInfo() {
   const sizeInfo = document.getElementById("sizeInfo");
   if (droppedCards.length === 0 || !baseImageSize) {
-    sizeInfo.textContent = "画像サイズ: ―"; return;
+    sizeInfo.textContent = "出力予定: ―"; return;
   }
   const columns = parseInt(document.getElementById("columns").value);
   const cardWidth = parseInt(document.getElementById("cardWidth").value);
