@@ -7,7 +7,7 @@
 // ----------------------------------------------------------------------------
 // 1. Constants & DOM Elements
 // ----------------------------------------------------------------------------
-const API_DELAY_MS = 150;
+const getRandomDelay = () => Math.floor(Math.random() * 51) + 100;
 
 const ui = {
   results: document.getElementById("results"),
@@ -146,8 +146,8 @@ async function processApiQueue() {
     } catch (e) {
       reject(e);
     }
-    // 150msの遅延を入れる (50-100msの要求に対して余裕を持つ)
-    await new Promise(r => setTimeout(r, API_DELAY_MS));
+    // サーバー負荷軽減のためランダムな遅延を入れる
+    await new Promise(r => setTimeout(r, getRandomDelay()));
   }
   isApiProcessing = false;
 }
@@ -680,8 +680,12 @@ ui.generateBtn.addEventListener("click", async () => {
   const userTotalWidth = parseInt(document.getElementById("totalWidth").value) || 0;
   const align = document.getElementById("align").value;
 
-  // 全画像の読み込みを待機
-  const imgs = await Promise.all(droppedCards.map(c => loadImage(c.url)));
+  // 全画像の読み込みを待機（サーバー負荷軽減のため順次処理と遅延）
+  const imgs = [];
+  for (const c of droppedCards) {
+    imgs.push(await loadImage(c.url));
+    await new Promise(r => setTimeout(r, getRandomDelay()));
+  }
   
   // 行ごとのレイアウト計算
   const rows = [];
