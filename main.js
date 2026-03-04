@@ -651,6 +651,7 @@ function renderDropPreview() {
       
       card.addEventListener("drop", (e) => {
         e.preventDefault(); e.stopPropagation();
+        ui.dropArea.classList.remove("dragover");
         const fromIdx = e.dataTransfer.getData("text/reorder-idx");
         if (fromIdx !== "" && parseInt(fromIdx) !== idx) {
           const item = droppedCards.splice(parseInt(fromIdx), 1)[0];
