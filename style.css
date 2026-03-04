@@ -428,7 +428,7 @@ select {
 
 .rotate-btn {
   position: absolute;
-  bottom: 5px;
+  top: 5px;
   background: rgba(0, 123, 255, 0.8);
   color: white;
   border: none;
@@ -460,8 +460,8 @@ select {
 
 .grayscale-btn {
   position: absolute;
-  bottom: 5px;
-  right: 5px;
+  top: 5px;
+  left: 65px;
   background: rgba(80, 80, 80, 0.8);
   color: white;
   border: none;
