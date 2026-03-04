@@ -393,7 +393,7 @@ ui.dropArea.addEventListener("drop", (e) => {
   if (json && !e.dataTransfer.getData("text/reorder-idx")) {
     const { url, w, h } = JSON.parse(json);
     if (!baseImageSize) baseImageSize = { w: Number(w), h: Number(h) };
-    droppedCards.push({ url, rotation: 0 });
+    droppedCards.push({ url, rotation: 0, grayscale: false });
     renderDropPreview();
     updateSizeInfo();
   }
@@ -425,7 +425,7 @@ async function handleFiles(files) {
 
       if (!baseImageSize) baseImageSize = { w: img.naturalWidth, h: img.naturalHeight };
       
-      droppedCards.push({ url: processedUrl, rotation: 0 });
+      droppedCards.push({ url: processedUrl, rotation: 0, grayscale: false });
     } catch (err) {
       console.error("画像の読み込みに失敗しました:", err);
     }
@@ -558,7 +558,7 @@ function calculateLayout() {
       const h = Math.round(isRotated ? cardWidth : cardWidth * ratio);
       rowW += w;
       rowH = Math.max(rowH, h);
-      return { w, h, rotation: card.rotation, url: card.url };
+      return { w, h, rotation: card.rotation, url: card.url, grayscale: card.grayscale };
     });
     rowW += Math.max(0, items.length - 1) * gap;
     maxWidth = Math.max(maxWidth, rowW);
@@ -622,18 +622,22 @@ function renderDropPreview() {
 
       // 画像自体の回転処理（CSS transform）
       const imgTransform = `translate(-50%, -50%) rotate(${cardData.rotation}deg)`;
+      const imgFilter = cardData.grayscale ? "grayscale(100%)" : "none";
       const imgW = isRotated ? displayH : displayW;
       const imgH = isRotated ? displayW : displayH;
 
       card.innerHTML = `
         <div style="width:100%; height:100%; overflow:hidden; position:relative;">
-          <img src="${cardData.url}" style="position:absolute; left:50%; top:50%; width:${imgW}px; height:${imgH}px; transform:${imgTransform}; pointer-events:none;" />
+          <img src="${cardData.url}" style="position:absolute; left:50%; top:50%; width:${imgW}px; height:${imgH}px; transform:${imgTransform}; filter:${imgFilter}; pointer-events:none;" />
         </div>
         <button class="rotate-btn rotate-l" title="左に90度回転">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
         </button>
         <button class="rotate-btn rotate-r" title="右に90度回転">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        </button>
+        <button class="grayscale-btn" title="白黒/カラー切り替え">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 22V2"></path><path d="M12 2a10 10 0 0 1 0 20" fill="currentColor" stroke="none"></path></svg>
         </button>
         <button class="remove-btn" title="削除">×</button>
       `;
@@ -681,6 +685,12 @@ function renderDropPreview() {
         currentCardData.rotation = (currentCardData.rotation + 90) % 360;
         renderDropPreview(); updateSizeInfo();
       };
+      
+      card.querySelector(".grayscale-btn").onclick = (e) => {
+        e.stopPropagation();
+        currentCardData.grayscale = !currentCardData.grayscale;
+        renderDropPreview();
+      };
 
       rowDiv.appendChild(card);
     });
@@ -725,6 +735,10 @@ ui.generateBtn.addEventListener("click", async () => {
       ctx.translate(cx, cy);
       // Canvasコンテキストを回転させて描画
       ctx.rotate(item.rotation * Math.PI / 180);
+
+      if (item.grayscale) {
+        ctx.filter = "grayscale(100%)";
+      }
       
       const isRotated = (item.rotation / 90) % 2 !== 0;
       // 回転している場合、描画する画像の幅と高さを入れ替える必要がある

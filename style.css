@@ -458,6 +458,30 @@ select {
   left: 35px;
 }
 
+.grayscale-btn {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: rgba(80, 80, 80, 0.8);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto !important;
+  z-index: 10;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+.grayscale-btn:hover {
+  background: #333;
+  color: white;
+}
+
 /* ドロップ後のカードスタイル */
 .canvas-card {
   position: relative;
