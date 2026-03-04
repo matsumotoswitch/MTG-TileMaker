@@ -622,7 +622,7 @@ function renderDropPreview() {
 
       // 画像自体の回転処理（CSS transform）
       const imgTransform = `translate(-50%, -50%) rotate(${cardData.rotation}deg)`;
-      const imgFilter = cardData.grayscale ? "grayscale(100%)" : "none";
+      const imgFilter = cardData.grayscale ? "grayscale(100%) brightness(0.5)" : "none";
       const imgW = isRotated ? displayH : displayW;
       const imgH = isRotated ? displayW : displayH;
 
@@ -738,7 +738,7 @@ ui.generateBtn.addEventListener("click", async () => {
       ctx.rotate(item.rotation * Math.PI / 180);
 
       if (item.grayscale) {
-        ctx.filter = "grayscale(100%)";
+        ctx.filter = "grayscale(100%) contrast(1.5) brightness(0.8)";
       }
       
       const isRotated = (item.rotation / 90) % 2 !== 0;
