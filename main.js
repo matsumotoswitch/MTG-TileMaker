@@ -49,6 +49,7 @@ let baseImageSize = null; // { w: number, h: number }
  * @returns {'ja' | 'en'}
  */
 function detectLang(query) {
+  // ひらがな、カタカナ、漢字が含まれているかを判定
   return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9faf]/.test(query) ? "ja" : "en";
 }
 
@@ -60,6 +61,7 @@ function detectLang(query) {
  * @returns {string} 画像URL
  */
 function getCardImageUrl(card, query = null) {
+  // 両面カードかつクエリがある場合、名前にマッチする面を探索
   if (query && card.card_faces && card.card_faces.length > 1) {
     const lowerQ = query.toLowerCase();
     const matchedFaces = card.card_faces.filter(face => {
@@ -67,7 +69,7 @@ function getCardImageUrl(card, query = null) {
     });
 
     if (matchedFaces.length > 0) {
-      // 完全一致 > 前方一致 > 部分一致 の順でスコアリングし、最も適切な面を選択
+      // 完全一致 > 前方一致 > 部分一致 の順で優先度を決定
       matchedFaces.sort((a, b) => {
         const getScore = (f) => {
           const n = (f.name || "").toLowerCase();
@@ -86,6 +88,7 @@ function getCardImageUrl(card, query = null) {
     }
   }
 
+  // 通常カードまたはフォールバック
   if (card.image_uris) {
     return card.image_uris.png || card.image_uris.normal;
   } else if (card.card_faces && card.card_faces[0].image_uris) {
@@ -106,11 +109,11 @@ function loadImage(url) {
       img.src = url;
     } else {
       img.crossOrigin = "anonymous";
-      // ブラウザのキャッシュがCORSヘッダーを含まない場合があるため、タイムスタンプでキャッシュを回避
+      // ブラウザキャッシュがCORSヘッダーを含まない場合があるため、タイムスタンプでキャッシュを回避
       img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
     }
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(img); // 画像生成プロセス全体を止めないよう、エラー時もresolveする
+    img.onerror = () => resolve(img); // エラー時も処理を継続させるためresolve
   });
 }
 
@@ -167,7 +170,7 @@ ui.searchBtn.addEventListener("click", async () => {
   if (!query) return;
 
   const lang = detectLang(query);
-  // Scryfallの検索構文: 完全一致の場合は "!" を付与
+  // Scryfall検索構文: 完全一致の場合は "!" を付与、langパラメータで言語指定
   let q = (match === "exact") ? `!${query}` : query;
   q += ` lang:${lang}`;
 
@@ -175,7 +178,7 @@ ui.searchBtn.addEventListener("click", async () => {
   let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=name`;
   ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px; color:#ccc;'>検索中...</p>";
 
-  // ページネーションを辿って全件取得する
+  // ページネーション処理：has_moreがtrueの間、next_pageを辿って全件取得
   try {
     let allCards = [];
     while (url) {
@@ -202,9 +205,9 @@ ui.searchBtn.addEventListener("click", async () => {
 
 // 検索結果のカード要素を作成し、DOMに追加する
 function addCardResult(card, query = null) {
-  // 両面カードの場合、検索クエリにヒットした面を個別にリストアップする
-  let targets = [];
+  const targets = [];
 
+  // 両面カードの場合、クエリにヒットした面を個別に抽出してリスト化
   if (query && card.card_faces && card.card_faces.length > 1) {
     const lowerQ = query.toLowerCase();
     const matchedFaces = card.card_faces.filter(face => {
@@ -238,7 +241,15 @@ function addCardResult(card, query = null) {
   }
 
   targets.forEach(target => {
-    const el = document.createElement("div");
+    const el = createSearchResultCard(target, card);
+    ui.results.appendChild(el);
+    setupLanguageButtons(el, card, target);
+  });
+}
+
+// 検索結果カードのDOM要素を作成
+function createSearchResultCard(target, card) {
+  const el = document.createElement("div");
     el.className = "card-item";
     el.draggable = true;
     el.innerHTML = `
@@ -253,7 +264,6 @@ function addCardResult(card, query = null) {
         <div class="langArea"></div>
       </div>
     `;
-    ui.results.appendChild(el);
 
     // 画像本来のサイズを取得し、オーバーレイに表示
     const img = el.querySelector("img");
@@ -270,8 +280,13 @@ function addCardResult(card, query = null) {
       }));
     });
 
-    // 他言語版の検索URLを構築 (prints_search_uri はデフォルトで英語のみの場合があるため lang:any を付与)
+  return el;
+}
+
+// 他言語版の取得と言語切り替えボタンの設定
+function setupLanguageButtons(el, card, target) {
     let printsUri = card.prints_search_uri;
+    // prints_search_uri はデフォルトで英語のみの場合があるため、lang:any を付与して全言語を取得可能にする
     if (printsUri) {
       try {
         const u = new URL(printsUri);
@@ -283,10 +298,10 @@ function addCardResult(card, query = null) {
       } catch (e) { console.error(e); }
     }
 
-    // 非同期で他言語版を取得し、ボタンを生成
     fetchAllPrints(printsUri).then(printCards => {
       const langs = {};
       printCards.forEach(p => {
+        // 同じセット・同じコレクター番号のカード（同種カードの他言語版）をフィルタリング
         if (p.set !== card.set) return;
         if (p.collector_number !== card.collector_number) return;
         
@@ -302,7 +317,6 @@ function addCardResult(card, query = null) {
       });
       renderLangButtons(el, langs, card.lang || "en");
     });
-  });
 }
 
 // Scryfallのページネーションを処理して全データを取得する
@@ -464,7 +478,7 @@ async function processRoundCorners(url) {
 
   const getIdx = (x, y) => (y * w + x) * 4;
 
-  // 指定座標(x,y)を起点に、色が近い領域を塗りつぶす（透明にする）
+  // 指定座標(x,y)を起点に、色が近い領域を塗りつぶす（Flood Fillアルゴリズム）
   const removeCornerColor = (startX, startY) => {
     const startIdx = getIdx(startX, startY);
     const r0 = data[startIdx];
@@ -472,7 +486,7 @@ async function processRoundCorners(url) {
     const b0 = data[startIdx + 2];
     const a0 = data[startIdx + 3];
 
-    // 起点がすでに透明、または白っぽくない場合は処理をスキップ
+    // 起点がすでに透明、または白っぽくない場合は処理対象外
     if (a0 < 20) return;
     if (r0 < whiteThreshold || g0 < whiteThreshold || b0 < whiteThreshold) return;
 
@@ -491,14 +505,14 @@ async function processRoundCorners(url) {
       const [cx, cy] = queue.shift();
       const idx = getIdx(cx, cy);
 
-      // 色差チェック
+      // 色差チェック：許容範囲内であれば透明化対象とする
       if (Math.abs(data[idx] - r0) > tolerance || 
           Math.abs(data[idx+1] - g0) > tolerance || 
           Math.abs(data[idx+2] - b0) > tolerance) {
         continue;
       }
 
-      // 透明化
+      // 透明化処理
       data[idx + 3] = 0;
 
       // 4近傍探索
@@ -553,6 +567,8 @@ function calculateLayout() {
     let rowH = 0;
     const items = row.map(card => {
       // 90度回転している場合、幅と高さの比率を入れ替えて計算する
+      // 通常: 幅=cardWidth, 高さ=cardWidth*ratio
+      // 回転: 幅=cardWidth*ratio, 高さ=cardWidth
       const isRotated = (card.rotation / 90) % 2 !== 0;
       const w = Math.round(isRotated ? cardWidth * ratio : cardWidth);
       const h = Math.round(isRotated ? cardWidth : cardWidth * ratio);
@@ -609,96 +625,103 @@ function renderDropPreview() {
 
     row.items.forEach((cardData, colIdx) => {
       const idx = rowIdx * settings.columns + colIdx;
-      const card = document.createElement("div");
-      card.className = "canvas-card";
-      card.draggable = true;
-
-      const isRotated = (cardData.rotation / 90) % 2 !== 0;
-      const displayW = cardData.w;
-      const displayH = cardData.h;
-
-      card.style.width = displayW + "px";
-      card.style.height = displayH + "px";
-
-      // 画像自体の回転処理（CSS transform）
-      const imgTransform = `translate(-50%, -50%) rotate(${cardData.rotation}deg)`;
-      const imgFilter = cardData.grayscale ? "grayscale(100%) brightness(0.5)" : "none";
-      const imgW = isRotated ? displayH : displayW;
-      const imgH = isRotated ? displayW : displayH;
-
-      card.innerHTML = `
-        <div style="width:100%; height:100%; overflow:hidden; position:relative;">
-          <img src="${cardData.url}" style="position:absolute; left:50%; top:50%; width:${imgW}px; height:${imgH}px; transform:${imgTransform}; filter:${imgFilter}; pointer-events:none;" />
-        </div>
-        <button class="rotate-btn rotate-l" title="左に90度回転">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-        </button>
-        <button class="rotate-btn rotate-r" title="右に90度回転">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-        </button>
-        <button class="grayscale-btn" title="白黒/カラー切り替え">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 22V2"></path><path d="M12 2a10 10 0 0 1 0 20" fill="currentColor" stroke="none"></path></svg>
-        </button>
-        <button class="remove-btn" title="削除">×</button>
-      `;
-
-      // ドラッグ＆ドロップによる並び替え処理
-      card.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/reorder-idx", idx);
-        card.style.opacity = "0.4";
-      });
-      card.addEventListener("dragover", (e) => e.preventDefault());
-      
-      card.addEventListener("drop", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        ui.dropArea.classList.remove("dragover");
-        const fromIdx = e.dataTransfer.getData("text/reorder-idx");
-        if (fromIdx !== "" && parseInt(fromIdx) !== idx) {
-          const item = droppedCards.splice(parseInt(fromIdx), 1)[0];
-          droppedCards.splice(idx, 0, item);
-          renderDropPreview(); updateSizeInfo();
-        // 新規ドロップがカード上に落ちた場合の挿入処理
-        } else if (!fromIdx) {
-          const json = e.dataTransfer.getData("application/json");
-          if (json) {
-            const { url } = JSON.parse(json);
-            droppedCards.splice(idx, 0, { url, rotation: 0 });
-            renderDropPreview(); updateSizeInfo();
-          }
-        }
-      });
-      card.addEventListener("dragend", () => card.style.opacity = "1");
-      
-      card.querySelector(".remove-btn").onclick = (e) => {
-        e.stopPropagation();
-        droppedCards.splice(idx, 1);
-        renderDropPreview(); updateSizeInfo();
-      };
-
-      const currentCardData = droppedCards[idx];
-      card.querySelector(".rotate-l").onclick = (e) => {
-        e.stopPropagation();
-        currentCardData.rotation = (currentCardData.rotation - 90) % 360;
-        renderDropPreview(); updateSizeInfo();
-      };
-      card.querySelector(".rotate-r").onclick = (e) => {
-        e.stopPropagation();
-        currentCardData.rotation = (currentCardData.rotation + 90) % 360;
-        renderDropPreview(); updateSizeInfo();
-      };
-      
-      card.querySelector(".grayscale-btn").onclick = (e) => {
-        e.stopPropagation();
-        currentCardData.grayscale = !currentCardData.grayscale;
-        renderDropPreview();
-      };
-
+      const card = createPreviewCard(cardData, idx);
       rowDiv.appendChild(card);
     });
     artboard.appendChild(rowDiv);
   });
 
   ui.dropArea.appendChild(artboard);
+}
+
+// プレビュー用カード要素の作成とイベント設定
+function createPreviewCard(cardData, idx) {
+  const card = document.createElement("div");
+  card.className = "canvas-card";
+  card.draggable = true;
+
+  const isRotated = (cardData.rotation / 90) % 2 !== 0;
+  const displayW = cardData.w;
+  const displayH = cardData.h;
+
+  card.style.width = displayW + "px";
+  card.style.height = displayH + "px";
+
+  // 画像自体の回転処理（CSS transform）
+  const imgTransform = `translate(-50%, -50%) rotate(${cardData.rotation}deg)`;
+  const imgFilter = cardData.grayscale ? "grayscale(100%) contrast(1.5) brightness(0.8)" : "none";
+  const imgW = isRotated ? displayH : displayW;
+  const imgH = isRotated ? displayW : displayH;
+
+  card.innerHTML = `
+    <div style="width:100%; height:100%; overflow:hidden; position:relative;">
+      <img src="${cardData.url}" style="position:absolute; left:50%; top:50%; width:${imgW}px; height:${imgH}px; transform:${imgTransform}; filter:${imgFilter}; pointer-events:none;" />
+    </div>
+    <button class="rotate-btn rotate-l" title="左に90度回転">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+    </button>
+    <button class="rotate-btn rotate-r" title="右に90度回転">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+    </button>
+    <button class="grayscale-btn" title="白黒/カラー切り替え">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 22V2"></path><path d="M12 2a10 10 0 0 1 0 20" fill="currentColor" stroke="none"></path></svg>
+    </button>
+    <button class="remove-btn" title="削除">×</button>
+  `;
+
+  // ドラッグ＆ドロップによる並び替え処理
+  card.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/reorder-idx", idx);
+    card.style.opacity = "0.4";
+  });
+  card.addEventListener("dragover", (e) => e.preventDefault());
+  
+  card.addEventListener("drop", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    ui.dropArea.classList.remove("dragover");
+    const fromIdx = e.dataTransfer.getData("text/reorder-idx");
+    if (fromIdx !== "" && parseInt(fromIdx) !== idx) {
+      const item = droppedCards.splice(parseInt(fromIdx), 1)[0];
+      droppedCards.splice(idx, 0, item);
+      renderDropPreview(); updateSizeInfo();
+    // 新規ドロップがカード上に落ちた場合の挿入処理
+    } else if (!fromIdx) {
+      const json = e.dataTransfer.getData("application/json");
+      if (json) {
+        const { url } = JSON.parse(json);
+        droppedCards.splice(idx, 0, { url, rotation: 0 });
+        renderDropPreview(); updateSizeInfo();
+      }
+    }
+  });
+  card.addEventListener("dragend", () => card.style.opacity = "1");
+  
+  // ボタンイベント設定
+  card.querySelector(".remove-btn").onclick = (e) => {
+    e.stopPropagation();
+    droppedCards.splice(idx, 1);
+    renderDropPreview(); updateSizeInfo();
+  };
+
+  const currentCardData = droppedCards[idx];
+  card.querySelector(".rotate-l").onclick = (e) => {
+    e.stopPropagation();
+    currentCardData.rotation = (currentCardData.rotation - 90) % 360;
+    renderDropPreview(); updateSizeInfo();
+  };
+  card.querySelector(".rotate-r").onclick = (e) => {
+    e.stopPropagation();
+    currentCardData.rotation = (currentCardData.rotation + 90) % 360;
+    renderDropPreview(); updateSizeInfo();
+  };
+  
+  card.querySelector(".grayscale-btn").onclick = (e) => {
+    e.stopPropagation();
+    currentCardData.grayscale = !currentCardData.grayscale;
+    renderDropPreview();
+  };
+
+  return card;
 }
 
 // 最終的な画像を生成してダウンロードする
@@ -724,6 +747,7 @@ ui.generateBtn.addEventListener("click", async () => {
 
   let currentY = 0;
   rows.forEach((row, rowIdx) => {
+    // 行ごとの配置開始X座標（左揃え、中央揃え、右揃え）
     let currentX = (align === "center") ? (finalCanvasWidth - row.width) / 2 : (align === "right") ? (finalCanvasWidth - row.width) : 0;
     
     row.items.forEach((item, itemIdx) => {
@@ -733,6 +757,7 @@ ui.generateBtn.addEventListener("click", async () => {
       ctx.save();
       const cx = currentX + item.w / 2;
       const cy = currentY + item.h / 2;
+      // 回転の中心となる座標へ移動
       ctx.translate(cx, cy);
       // Canvasコンテキストを回転させて描画
       ctx.rotate(item.rotation * Math.PI / 180);
@@ -743,6 +768,7 @@ ui.generateBtn.addEventListener("click", async () => {
       
       const isRotated = (item.rotation / 90) % 2 !== 0;
       // 回転している場合、描画する画像の幅と高さを入れ替える必要がある
+      // (コンテキストが回転しているため、描画矩形は元の向きで指定する)
       const drawW = isRotated ? item.h : item.w;
       const drawH = isRotated ? item.w : item.h;
 
