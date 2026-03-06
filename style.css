@@ -347,6 +347,31 @@ select {
   font-size: 12px;
 }
 
+.card-overlay .name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.card-overlay .copy-btn {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transition: color 0.2s;
+}
+
+.card-overlay .copy-btn:hover {
+  color: #fff;
+}
+
 .card-overlay .set-name {
   color: #ddd;
 }
