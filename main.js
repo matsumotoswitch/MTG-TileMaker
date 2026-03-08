@@ -636,6 +636,7 @@ function renderDropPreview() {
     const rowDiv = document.createElement("div");
     rowDiv.style.display = "flex";
     rowDiv.style.gap = gap + "px";
+    rowDiv.style.setProperty("--gap-size", gap + "px");
     if (rowIdx < rows.length - 1) {
       rowDiv.style.marginBottom = gap + "px";
     }
@@ -692,22 +693,52 @@ function createPreviewCard(cardData, idx) {
     e.dataTransfer.setData("text/reorder-idx", idx);
     card.style.opacity = "0.4";
   });
-  card.addEventListener("dragover", (e) => e.preventDefault());
+
+  // ガイドバー表示制御
+  card.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    const rect = card.getBoundingClientRect();
+    const isLeft = e.clientX < rect.left + rect.width / 2;
+    if (isLeft) {
+      card.classList.add("drop-target-left");
+      card.classList.remove("drop-target-right");
+    } else {
+      card.classList.add("drop-target-right");
+      card.classList.remove("drop-target-left");
+    }
+  });
+
+  card.addEventListener("dragleave", (e) => {
+    // 子要素への移動では消さない
+    if (card.contains(e.relatedTarget)) return;
+    card.classList.remove("drop-target-left", "drop-target-right");
+  });
   
   card.addEventListener("drop", (e) => {
     e.preventDefault(); e.stopPropagation();
     ui.dropArea.classList.remove("dragover");
-    const fromIdx = e.dataTransfer.getData("text/reorder-idx");
-    if (fromIdx !== "" && parseInt(fromIdx) !== idx) {
-      const item = droppedCards.splice(parseInt(fromIdx), 1)[0];
-      droppedCards.splice(idx, 0, item);
-      renderDropPreview(); updateSizeInfo();
-    // 新規ドロップがカード上に落ちた場合の挿入処理
-    } else if (!fromIdx) {
+    card.classList.remove("drop-target-left", "drop-target-right");
+
+    const rect = card.getBoundingClientRect();
+    const isLeft = e.clientX < rect.left + rect.width / 2;
+    let insertAt = isLeft ? idx : idx + 1;
+
+    const fromIdxStr = e.dataTransfer.getData("text/reorder-idx");
+    if (fromIdxStr !== "") {
+      const fromIdx = parseInt(fromIdxStr);
+      if (fromIdx !== idx) {
+        const [item] = droppedCards.splice(fromIdx, 1);
+        // 前から後ろへ移動する場合、削除によってインデックスがずれるのを補正
+        if (fromIdx < insertAt) insertAt--;
+        droppedCards.splice(insertAt, 0, item);
+        renderDropPreview(); updateSizeInfo();
+      }
+    } else {
+      // 新規ドロップ
       const json = e.dataTransfer.getData("application/json");
       if (json) {
         const { url } = JSON.parse(json);
-        droppedCards.splice(idx, 0, { url, rotation: 0 });
+        droppedCards.splice(insertAt, 0, { url, rotation: 0, grayscale: false });
         renderDropPreview(); updateSizeInfo();
       }
     }

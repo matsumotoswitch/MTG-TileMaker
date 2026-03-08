@@ -527,6 +527,23 @@ select {
   border-radius: 0; /* 出力画像用なので角丸なし */
   pointer-events: none;
 }
+
+/* ドロップ位置のガイドバー */
+.canvas-card.drop-target-left::before,
+.canvas-card.drop-target-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+  z-index: 100;
+  pointer-events: none;
+}
+.canvas-card.drop-target-left::before { left: calc(var(--gap-size, 0px) * -0.5 - 2px); }
+.canvas-card.drop-target-right::after { right: calc(var(--gap-size, 0px) * -0.5 - 2px); }
+
 /* ==========================================================================
    7. UIコンポーネント（言語セレクタなど）
    ========================================================================== */
