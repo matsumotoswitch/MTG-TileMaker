@@ -275,10 +275,49 @@ function createSearchResultCard(target, card) {
     copyBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       navigator.clipboard.writeText(target.displayName).then(() => {
-        const originalHtml = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        // ツールチップ要素を作成して表示
+        const tooltip = document.createElement('div');
+        tooltip.textContent = 'カード名をコピーしました';
+        Object.assign(tooltip.style, {
+          position: 'fixed',
+          // 初期位置は画面外に設定してサイズを計測できるようにする
+          left: '-9999px',
+          top: '-9999px',
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          zIndex: '9999',
+          transition: 'opacity 0.5s ease-out',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap'
+        });
+        document.body.appendChild(tooltip);
+
+        // ツールチップのサイズを取得し、画面外にはみ出さないように位置を計算・調整する
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+
+        // カーソル位置を基準に中央配置
+        let left = e.clientX - tooltipRect.width / 2;
+        let top = e.clientY - tooltipRect.height - 10; // カーソルの10px上に表示
+
+        // 左右の画面端からはみ出さないように調整
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > viewportWidth - 10) {
+          left = viewportWidth - tooltipRect.width - 10;
+        }
+        // 上の画面端からはみ出さないように調整
+        if (top < 10) top = 10;
+
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+
+        // 時間差でフェードアウトさせてから削除
         setTimeout(() => {
-          copyBtn.innerHTML = originalHtml;
+          tooltip.style.opacity = '0';
+          setTimeout(() => tooltip.remove(), 500);
         }, 1000);
       }).catch(err => console.error("コピー失敗:", err));
     });
