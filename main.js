@@ -249,23 +249,31 @@ function addCardResult(card, query = null) {
 
 // 検索結果カードのDOM要素を作成
 function createSearchResultCard(target, card) {
+  const engName = card.name.split(" // ")[0];
+  const gathererUrl = `https://gatherer.wizards.com/Pages/Search/Default.aspx?name=+[%22${encodeURIComponent(engName)}%22]`;
+
   const el = document.createElement("div");
     el.className = "card-item";
     el.draggable = true;
     el.innerHTML = `
       <img src="${target.imgUrl}" crossorigin="anonymous" style="width:100%; display:block; pointer-events:none;" />
       <div class="card-overlay">
-        <div class="name-row">
+        <div class="name-row" style="display: flex; align-items: center; gap: 4px;">
+          <a class="card-link" href="${gathererUrl}" target="_blank" title="Gathererで検索" style="border: 1px solid #ccc; border-radius: 50%; padding: 1px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23000000'/%3E%3Ctext x='50%25' y='50%25' dy='.35em' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold' font-size='28'%3EG%3C/text%3E%3C/svg%3E" alt="G" style="width:14px; height:14px; display:block;" />
+          </a>
+          <a class="card-link" href="${card.scryfall_uri}" target="_blank" title="Scryfallで詳細を見る" style="border: 1px solid #ccc; border-radius: 50%; padding: 1px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23633c65'/%3E%3Ctext x='50%25' y='50%25' dy='.35em' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold' font-size='28'%3ESF%3C/text%3E%3C/svg%3E" alt="SF" style="width:14px; height:14px; display:block;" />
+          </a>
           <button class="copy-btn" title="カード名をコピー">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
-          <div class="name">${target.displayName}</div>
+          <div class="name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;" title="${target.displayName}">${target.displayName}</div>
         </div>
       <div class="set-name">${card.set_name}</div>
         <div class="size"></div>
       </div>
       <div class="card-footer">
-        <a class="card-link" href="${card.scryfall_uri}" target="_blank" title="Scryfallで詳細を見る">🌐</a>
         <div class="langArea"></div>
       </div>
     `;
