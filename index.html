@@ -77,9 +77,10 @@
         <div class="generate-box">
           <div id="sizeInfo"></div>
           <div class="button-group">
-            <input type="file" id="fileInput" accept="image/*" multiple style="display: none;" />
+            <input type="file" id="fileInput" accept="image/*" multiple />
             <button id="uploadBtn">画像追加</button>
             <button id="generateBtn">画像生成</button>
+            <button id="clearBtn">クリア</button>
           </div>
         </div>
       </div>
@@ -103,6 +104,47 @@
       <button id="closeModalBtn">閉じる</button>
     </div>
   </div>
+
+    <!-- テンプレート群 -->
+    <template id="search-result-template">
+      <div class="card-item" draggable="true">
+        <img class="card-img" crossorigin="anonymous" />
+        <div class="card-overlay">
+          <div class="name-row">
+            <a class="card-link gatherer-link" target="_blank" title="Gathererで検索">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23000000'/%3E%3Ctext x='50%25' y='50%25' dy='.35em' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold' font-size='28'%3EG%3C/text%3E%3C/svg%3E" alt="G" />
+            </a>
+            <a class="card-link scryfall-link" target="_blank" title="Scryfallで詳細を見る">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23633c65'/%3E%3Ctext x='50%25' y='50%25' dy='.35em' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold' font-size='28'%3ESF%3C/text%3E%3C/svg%3E" alt="SF" />
+            </a>
+            <button class="copy-btn" title="カード名をコピー">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+            <div class="name"></div>
+          </div>
+          <div class="set-name"></div>
+          <div class="size"></div>
+        </div>
+        <div class="card-footer">
+          <div class="langArea"></div>
+        </div>
+      </div>
+    </template>
+
+    <template id="preview-card-template">
+      <div class="canvas-card" draggable="true">
+        <div class="img-wrapper">
+          <img class="preview-img" />
+        </div>
+        <button class="rotate-btn rotate-l" title="左に90度回転">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+        </button>
+        <button class="rotate-btn rotate-r" title="右に90度回転">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        </button>
+        <button class="remove-btn" title="削除">×</button>
+      </div>
+    </template>
 
   <script src="main.js"></script>
 </body>

@@ -86,6 +86,10 @@ select, .setting input[type="number"] {
   outline: none;
 }
 
+#fileInput {
+  display: none;
+}
+
 select {
   cursor: pointer;
 }
@@ -240,6 +244,17 @@ select {
 /* ==========================================================================
    4. メインコンテンツエリア（結果とドロップゾーン）
    ========================================================================== */
+/* 検索メッセージ */
+.search-message {
+  padding: 0 10px;
+  margin-top: 6px;
+}
+.search-message.loading,
+.search-message.empty,
+.search-message.error {
+  color: #ccc;
+}
+
 .results, #dropArea {
   margin-top: 8px;
   background: #3b3732;
@@ -259,6 +274,12 @@ select {
   align-items: flex-start;
   padding: 0px 8px;
   transition: all 0.2s;
+}
+
+/* カードがある場合のドロップエリアスタイル */
+#dropArea.has-cards {
+  display: block;
+  padding: 10px;
 }
 
 /* ドラッグオーバー時の視覚効果 */
@@ -355,6 +376,22 @@ select {
   width: 100%;
 }
 
+.card-overlay .card-link {
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  padding: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  pointer-events: auto;
+}
+.card-overlay .card-link img {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
 .card-overlay .copy-btn {
   background: transparent;
   border: none;
@@ -378,6 +415,23 @@ select {
 
 .card-overlay .size {
   color: #ccc;
+}
+
+/* コピーツールチップ */
+.copy-tooltip {
+  position: fixed;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 9999;
+  transition: opacity 0.5s ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.copy-tooltip.fade-out {
+  opacity: 0;
 }
 
 .card-footer {
@@ -418,6 +472,23 @@ select {
   box-shadow: 0 0 15px rgba(0,0,0,0.5);
   transition: width 0.3s ease;
   min-height: 100px; /* 空の状態でも枠が見えるように */
+}
+
+/* プレビューカード内の要素 */
+.canvas-row {
+  display: flex;
+}
+.img-wrapper {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+.preview-img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
 }
 
 /* ドロップエリアのドラッグオーバー反応 */
@@ -504,6 +575,10 @@ select {
   display: block;
   border-radius: 0; /* 出力画像用なので角丸なし */
   pointer-events: none;
+}
+
+.canvas-card.dragging {
+  opacity: 0.4;
 }
 
 /* ドロップ位置のガイドバー */

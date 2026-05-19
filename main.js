@@ -21,6 +21,7 @@ const ui = {
   closeModalBtn: document.getElementById("closeModalBtn"),
   uploadBtn: document.getElementById("uploadBtn"),
   fileInput: document.getElementById("fileInput"),
+  clearBtn: document.getElementById("clearBtn"),
   sizeInfo: document.getElementById("sizeInfo"),
   settings: {
     columns: document.getElementById("columns"),
@@ -176,7 +177,7 @@ ui.searchBtn.addEventListener("click", async () => {
 
   // unique=prints: 同名カードでもセット違いなどを全て取得する
   let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=name`;
-  ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px; color:#ccc;'>検索中...</p>";
+  ui.results.innerHTML = "<p class='search-message loading'>検索中...</p>";
 
   // ページネーション処理：has_moreがtrueの間、next_pageを辿って全件取得
   try {
@@ -191,7 +192,7 @@ ui.searchBtn.addEventListener("click", async () => {
     ui.results.innerHTML = "";
 
     if (allCards.length === 0) {
-      ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px; color:#ccc;'>該当するカードが見つかりませんでした。</p>";
+      ui.results.innerHTML = "<p class='search-message empty'>該当するカードが見つかりませんでした。</p>";
       return;
     }
 
@@ -199,7 +200,7 @@ ui.searchBtn.addEventListener("click", async () => {
       addCardResult(card, query);
     });
   } catch (e) {
-    ui.results.innerHTML = "<p style='padding:0 10px; margin-top:6px;'>検索エラーが発生しました</p>";
+    ui.results.innerHTML = "<p class='search-message error'>検索エラーが発生しました</p>";
   }
 });
 
@@ -252,31 +253,21 @@ function createSearchResultCard(target, card) {
   const engName = card.name.split(" // ")[0];
   const gathererUrl = `https://gatherer.wizards.com/Pages/Search/Default.aspx?name=+[%22${encodeURIComponent(engName)}%22]`;
 
-  const el = document.createElement("div");
-    el.className = "card-item";
-    el.draggable = true;
-    el.innerHTML = `
-      <img src="${target.imgUrl}" crossorigin="anonymous" style="width:100%; display:block; pointer-events:none;" />
-      <div class="card-overlay">
-        <div class="name-row" style="display: flex; align-items: center; gap: 4px;">
-          <a class="card-link" href="${gathererUrl}" target="_blank" title="Gathererで検索" style="border: 1px solid #ccc; border-radius: 50%; padding: 1px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
-            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23000000'/%3E%3Ctext x='50%25' y='50%25' dy='.35em' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold' font-size='28'%3EG%3C/text%3E%3C/svg%3E" alt="G" style="width:14px; height:14px; display:block;" />
-          </a>
-          <a class="card-link" href="${card.scryfall_uri}" target="_blank" title="Scryfallで詳細を見る" style="border: 1px solid #ccc; border-radius: 50%; padding: 1px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
-            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23633c65'/%3E%3Ctext x='50%25' y='50%25' dy='.35em' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold' font-size='28'%3ESF%3C/text%3E%3C/svg%3E" alt="SF" style="width:14px; height:14px; display:block;" />
-          </a>
-          <button class="copy-btn" title="カード名をコピー">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          </button>
-          <div class="name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;" title="${target.displayName}">${target.displayName}</div>
-        </div>
-      <div class="set-name">${card.set_name}</div>
-        <div class="size"></div>
-      </div>
-      <div class="card-footer">
-        <div class="langArea"></div>
-      </div>
-    `;
+  const template = document.getElementById("search-result-template");
+  const clone = template.content.cloneNode(true);
+  const el = clone.querySelector(".card-item");
+
+  const img = el.querySelector(".card-img");
+  img.src = target.imgUrl;
+
+  el.querySelector(".gatherer-link").href = gathererUrl;
+  el.querySelector(".scryfall-link").href = card.scryfall_uri;
+
+  const nameEl = el.querySelector(".name");
+  nameEl.title = target.displayName;
+  nameEl.textContent = target.displayName;
+
+  el.querySelector(".set-name").textContent = card.set_name;
 
     // コピーボタンのイベント設定
     const copyBtn = el.querySelector(".copy-btn");
@@ -286,21 +277,11 @@ function createSearchResultCard(target, card) {
         // ツールチップ要素を作成して表示
         const tooltip = document.createElement('div');
         tooltip.textContent = 'カード名をコピーしました';
-        Object.assign(tooltip.style, {
-          position: 'fixed',
-          // 初期位置は画面外に設定してサイズを計測できるようにする
-          left: '-9999px',
-          top: '-9999px',
-          background: 'rgba(0,0,0,0.8)',
-          color: 'white',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          zIndex: '9999',
-          transition: 'opacity 0.5s ease-out',
-          pointerEvents: 'none',
-          whiteSpace: 'nowrap'
-        });
+        tooltip.className = 'copy-tooltip';
+
+        // 初期位置は画面外に設定してサイズを計測できるようにする
+        tooltip.style.left = '-9999px';
+        tooltip.style.top = '-9999px';
         document.body.appendChild(tooltip);
 
         // ツールチップのサイズを取得し、画面外にはみ出さないように位置を計算・調整する
@@ -324,14 +305,13 @@ function createSearchResultCard(target, card) {
 
         // 時間差でフェードアウトさせてから削除
         setTimeout(() => {
-          tooltip.style.opacity = '0';
+          tooltip.classList.add("fade-out");
           setTimeout(() => tooltip.remove(), 500);
         }, 1000);
       }).catch(err => console.error("コピー失敗:", err));
     });
 
     // 画像本来のサイズを取得し、オーバーレイに表示
-    const img = el.querySelector("img");
     img.onload = () => {
       el.dataset.w = img.naturalWidth;
       el.dataset.h = img.naturalHeight;
@@ -664,7 +644,7 @@ function renderDropPreview() {
 
   if (!layout) {
     ui.dropArea.innerHTML = '<p>ここにカードをドラッグ＆ドロップ</p>';
-    ui.dropArea.style.display = 'flex';
+    ui.dropArea.classList.remove("has-cards");
     baseImageSize = null;
     return;
   }
@@ -672,8 +652,7 @@ function renderDropPreview() {
   const { rows, finalCanvasWidth, settings } = layout;
   const { gap, align } = settings;
 
-  ui.dropArea.style.display = "block";
-  ui.dropArea.style.padding = "10px";
+  ui.dropArea.classList.add("has-cards");
 
   const artboard = document.createElement("div");
   artboard.className = "artboard";
@@ -681,7 +660,7 @@ function renderDropPreview() {
   
   rows.forEach((row, rowIdx) => {
     const rowDiv = document.createElement("div");
-    rowDiv.style.display = "flex";
+    rowDiv.className = "canvas-row";
     rowDiv.style.gap = gap + "px";
     rowDiv.style.setProperty("--gap-size", gap + "px");
     if (rowIdx < rows.length - 1) {
@@ -702,9 +681,9 @@ function renderDropPreview() {
 
 // プレビュー用カード要素の作成とイベント設定
 function createPreviewCard(cardData, idx) {
-  const card = document.createElement("div");
-  card.className = "canvas-card";
-  card.draggable = true;
+  const template = document.getElementById("preview-card-template");
+  const clone = template.content.cloneNode(true);
+  const card = clone.querySelector(".canvas-card");
 
   const isRotated = (cardData.rotation / 90) % 2 !== 0;
   const displayW = cardData.w;
@@ -718,23 +697,16 @@ function createPreviewCard(cardData, idx) {
   const imgW = isRotated ? displayH : displayW;
   const imgH = isRotated ? displayW : displayH;
 
-  card.innerHTML = `
-    <div style="width:100%; height:100%; overflow:hidden; position:relative;">
-      <img src="${cardData.url}" style="position:absolute; left:50%; top:50%; width:${imgW}px; height:${imgH}px; transform:${imgTransform}; pointer-events:none;" />
-    </div>
-    <button class="rotate-btn rotate-l" title="左に90度回転">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-    </button>
-    <button class="rotate-btn rotate-r" title="右に90度回転">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-    </button>
-    <button class="remove-btn" title="削除">×</button>
-  `;
+  const img = card.querySelector(".preview-img");
+  img.src = cardData.url;
+  img.style.width = imgW + "px";
+  img.style.height = imgH + "px";
+  img.style.transform = imgTransform;
 
   // ドラッグ＆ドロップによる並び替え処理
   card.addEventListener("dragstart", (e) => {
     e.dataTransfer.setData("text/reorder-idx", idx);
-    card.style.opacity = "0.4";
+    card.classList.add("dragging");
   });
 
   // ガイドバー表示制御
@@ -786,7 +758,7 @@ function createPreviewCard(cardData, idx) {
       }
     }
   });
-  card.addEventListener("dragend", () => card.style.opacity = "1");
+  card.addEventListener("dragend", () => card.classList.remove("dragging"));
   
   // ボタンイベント設定
   card.querySelector(".remove-btn").onclick = (e) => {
@@ -869,13 +841,7 @@ ui.generateBtn.addEventListener("click", async () => {
   link.click();
 });
 
-// クリアボタンの追加とイベント設定
-const clearBtn = document.createElement("button");
-clearBtn.id = "clearBtn";
-clearBtn.textContent = "クリア";
-ui.generateBtn.parentNode.insertBefore(clearBtn, ui.generateBtn.nextSibling);
-
-clearBtn.addEventListener("click", () => {
+ui.clearBtn.addEventListener("click", () => {
   if (droppedCards.length === 0) return;
   if (!confirm("配置したカードをすべて削除しますか？")) return;
   droppedCards = [];
