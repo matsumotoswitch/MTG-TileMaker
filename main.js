@@ -9,6 +9,10 @@
 // ----------------------------------------------------------------------------
 // Scryfall APIへの過度なアクセスを防ぐため、リクエスト間にランダムな遅延(100-150ms)を設ける
 const getRandomDelay = () => Math.floor(Math.random() * 51) + 100;
+// セッション単位のキャッシュバスティング用タイムスタンプ
+const SESSION_TS = Date.now();
+// ページネーションの安全上限（無限ループ防止）
+const MAX_PAGES = 20;
 
 const ui = {
   results: document.getElementById("results"),
@@ -104,17 +108,17 @@ function getCardImageUrl(card, query = null) {
  * @returns {Promise<HTMLImageElement>}
  */
 function loadImage(url) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     if (url.startsWith("data:")) {
       img.src = url;
     } else {
       img.crossOrigin = "anonymous";
-      // ブラウザキャッシュがCORSヘッダーを含まない場合があるため、タイムスタンプでキャッシュを回避
-      img.src = url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
+      // ブラウザキャッシュがCORSヘッダーを含まない場合があるため、セッション単位のタイムスタンプでキャッシュを回避
+      img.src = url + (url.includes('?') ? '&' : '?') + "t=" + SESSION_TS;
     }
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(img); // エラー時も処理を継続させるためresolve
+    img.onerror = () => reject(new Error(`画像の読み込みに失敗: ${url}`));
   });
 }
 
@@ -148,6 +152,12 @@ async function processApiQueue() {
     const { url, resolve, reject } = apiQueue.shift();
     try {
       const res = await fetch(url);
+      // レート制限(429)の場合はリトライ
+      if (res.status === 429) {
+        apiQueue.unshift({ url, resolve, reject });
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
       const data = await res.json();
       resolve(data);
@@ -182,11 +192,13 @@ ui.searchBtn.addEventListener("click", async () => {
   // ページネーション処理：has_moreがtrueの間、next_pageを辿って全件取得
   try {
     let allCards = [];
-    while (url) {
+    let pageCount = 0;
+    while (url && pageCount < MAX_PAGES) {
       const data = await fetchScryfall(url);
       if (!data.data) break;
       allCards = allCards.concat(data.data);
       url = data.has_more ? data.next_page : null;
+      pageCount++;
     }
 
     ui.results.innerHTML = "";
@@ -269,110 +281,112 @@ function createSearchResultCard(target, card) {
 
   el.querySelector(".set-name").textContent = card.set_name;
 
-    // コピーボタンのイベント設定
-    const copyBtn = el.querySelector(".copy-btn");
-    copyBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      navigator.clipboard.writeText(target.displayName).then(() => {
-        // ツールチップ要素を作成して表示
-        const tooltip = document.createElement('div');
-        tooltip.textContent = 'カード名をコピーしました';
-        tooltip.className = 'copy-tooltip';
+  // コピーボタンのイベント設定
+  const copyBtn = el.querySelector(".copy-btn");
+  copyBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(target.displayName).then(() => {
+      // ツールチップ要素を作成して表示
+      const tooltip = document.createElement('div');
+      tooltip.textContent = 'カード名をコピーしました';
+      tooltip.className = 'copy-tooltip';
 
-        // 初期位置は画面外に設定してサイズを計測できるようにする
-        tooltip.style.left = '-9999px';
-        tooltip.style.top = '-9999px';
-        document.body.appendChild(tooltip);
+      // 初期位置は画面外に設定してサイズを計測できるようにする
+      tooltip.style.left = '-9999px';
+      tooltip.style.top = '-9999px';
+      document.body.appendChild(tooltip);
 
-        // ツールチップのサイズを取得し、画面外にはみ出さないように位置を計算・調整する
-        const tooltipRect = tooltip.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
+      // ツールチップのサイズを取得し、画面外にはみ出さないように位置を計算・調整する
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
 
-        // カーソル位置を基準に中央配置
-        let left = e.clientX - tooltipRect.width / 2;
-        let top = e.clientY - tooltipRect.height - 10; // カーソルの10px上に表示
+      // カーソル位置を基準に中央配置
+      let left = e.clientX - tooltipRect.width / 2;
+      let top = e.clientY - tooltipRect.height - 10; // カーソルの10px上に表示
 
-        // 左右の画面端からはみ出さないように調整
-        if (left < 10) left = 10;
-        if (left + tooltipRect.width > viewportWidth - 10) {
-          left = viewportWidth - tooltipRect.width - 10;
-        }
-        // 上の画面端からはみ出さないように調整
-        if (top < 10) top = 10;
+      // 左右の画面端からはみ出さないように調整
+      if (left < 10) left = 10;
+      if (left + tooltipRect.width > viewportWidth - 10) {
+        left = viewportWidth - tooltipRect.width - 10;
+      }
+      // 上の画面端からはみ出さないように調整
+      if (top < 10) top = 10;
 
-        tooltip.style.left = left + 'px';
-        tooltip.style.top = top + 'px';
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
 
-        // 時間差でフェードアウトさせてから削除
-        setTimeout(() => {
-          tooltip.classList.add("fade-out");
-          setTimeout(() => tooltip.remove(), 500);
-        }, 1000);
-      }).catch(err => console.error("コピー失敗:", err));
-    });
+      // 時間差でフェードアウトさせてから削除
+      setTimeout(() => {
+        tooltip.classList.add("fade-out");
+        setTimeout(() => tooltip.remove(), 500);
+      }, 1000);
+    }).catch(err => console.error("コピー失敗:", err));
+  });
 
-    // 画像本来のサイズを取得し、オーバーレイに表示
-    img.onload = () => {
-      el.dataset.w = img.naturalWidth;
-      el.dataset.h = img.naturalHeight;
-      el.querySelector(".size").textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
-    };
+  // 画像本来のサイズを取得し、オーバーレイに表示
+  img.onload = () => {
+    el.dataset.w = img.naturalWidth;
+    el.dataset.h = img.naturalHeight;
+    el.querySelector(".size").textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+  };
 
-    // ドロップ先に渡すデータ。言語切り替え後のURLに対応するため img.src を使用
-    el.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("application/json", JSON.stringify({
-        url: img.src, w: el.dataset.w, h: el.dataset.h
-      }));
-    });
+  // ドロップ先に渡すデータ。言語切り替え後のURLに対応するため img.src を使用
+  el.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("application/json", JSON.stringify({
+      url: img.src, w: el.dataset.w, h: el.dataset.h
+    }));
+  });
 
   return el;
 }
 
 // 他言語版の取得と言語切り替えボタンの設定
 function setupLanguageButtons(el, card, target) {
-    let printsUri = card.prints_search_uri;
-    // prints_search_uri はデフォルトで英語のみの場合があるため、lang:any を付与して全言語を取得可能にする
-    if (printsUri) {
-      try {
-        const u = new URL(printsUri);
-        const q = u.searchParams.get("q");
-        if (q) {
-          u.searchParams.set("q", q + " lang:any");
-          printsUri = u.toString();
-        }
-      } catch (e) { console.error(e); }
-    }
+  let printsUri = card.prints_search_uri;
+  // prints_search_uri はデフォルトで英語のみの場合があるため、lang:any を付与して全言語を取得可能にする
+  if (printsUri) {
+    try {
+      const u = new URL(printsUri);
+      const q = u.searchParams.get("q");
+      if (q) {
+        u.searchParams.set("q", q + " lang:any");
+        printsUri = u.toString();
+      }
+    } catch (e) { console.error(e); }
+  }
 
-    fetchAllPrints(printsUri).then(printCards => {
-      const langs = {};
-      printCards.forEach(p => {
-        // 同じセット・同じコレクター番号のカード（同種カードの他言語版）をフィルタリング
-        if (p.set !== card.set) return;
-        if (p.collector_number !== card.collector_number) return;
-        
-        let pUrl = null;
-        if (target.faceIndex >= 0 && p.card_faces && p.card_faces[target.faceIndex]) {
-           const f = p.card_faces[target.faceIndex];
-           if (f.image_uris) pUrl = f.image_uris.png || f.image_uris.normal;
-        } else {
-           pUrl = getCardImageUrl(p); // 通常カード
-        }
+  fetchAllPrints(printsUri).then(printCards => {
+    const langs = {};
+    printCards.forEach(p => {
+      // 同じセット・同じコレクター番号のカード（同種カードの他言語版）をフィルタリング
+      if (p.set !== card.set) return;
+      if (p.collector_number !== card.collector_number) return;
 
-        if (pUrl) langs[p.lang] = pUrl;
-      });
-      renderLangButtons(el, langs, card.lang || "en");
+      let pUrl = null;
+      if (target.faceIndex >= 0 && p.card_faces && p.card_faces[target.faceIndex]) {
+        const f = p.card_faces[target.faceIndex];
+        if (f.image_uris) pUrl = f.image_uris.png || f.image_uris.normal;
+      } else {
+        pUrl = getCardImageUrl(p); // 通常カード
+      }
+
+      if (pUrl) langs[p.lang] = pUrl;
     });
+    renderLangButtons(el, langs, card.lang || "en");
+  });
 }
 
 // Scryfallのページネーションを処理して全データを取得する
 async function fetchAllPrints(url) {
   let all = [];
   let next = url;
-  while (next) {
+  let pageCount = 0;
+  while (next && pageCount < MAX_PAGES) {
     const data = await fetchScryfall(next);
     if (!data.data) break;
     all = all.concat(data.data);
     next = data.has_more ? data.next_page : null;
+    pageCount++;
   }
   return all;
 }
@@ -546,8 +560,9 @@ async function processRoundCorners(url) {
     const minY = (startY < h / 2) ? 0 : h - limitY;
     const maxY = (startY < h / 2) ? limitY : h;
 
-    while (queue.length > 0) {
-      const [cx, cy] = queue.shift();
+    let head = 0;
+    while (head < queue.length) {
+      const [cx, cy] = queue[head++];
       const idx = getIdx(cx, cy);
 
       // 色差チェック：許容範囲内であれば透明化対象とする
@@ -770,7 +785,7 @@ function createPreviewCard(cardData, idx) {
   const currentCardData = droppedCards[idx];
   card.querySelector(".rotate-l").onclick = (e) => {
     e.stopPropagation();
-    currentCardData.rotation = (currentCardData.rotation - 90) % 360;
+    currentCardData.rotation = (currentCardData.rotation - 90 + 360) % 360;
     renderDropPreview(); updateSizeInfo();
   };
   card.querySelector(".rotate-r").onclick = (e) => {
@@ -790,10 +805,21 @@ ui.generateBtn.addEventListener("click", async () => {
   const { rows, totalHeight, finalCanvasWidth, settings } = layout;
   const { gap, align } = settings;
 
+  // ローディング表示：ボタンを無効化して進捗を表示
+  ui.generateBtn.disabled = true;
+  const originalText = ui.generateBtn.textContent;
+  ui.generateBtn.textContent = "生成中...";
+
+  try {
   // 高解像度画像を順次取得（サーバー負荷軽減のため遅延を入れる）
   const imgs = [];
   for (const c of droppedCards) {
-    imgs.push(await loadImage(c.url));
+    try {
+      imgs.push(await loadImage(c.url));
+    } catch (e) {
+      console.warn("画像のロードをスキップ:", c.url);
+      imgs.push(null);
+    }
     await new Promise(r => setTimeout(r, getRandomDelay()));
   }
   
@@ -811,6 +837,7 @@ ui.generateBtn.addEventListener("click", async () => {
     row.items.forEach((item, itemIdx) => {
       const cardIdx = rowIdx * settings.columns + itemIdx;
       const img = imgs[cardIdx];
+      if (!img) { currentX += item.w + gap; return; }
 
       ctx.save();
       const cx = currentX + item.w / 2;
@@ -836,9 +863,15 @@ ui.generateBtn.addEventListener("click", async () => {
 
   // 画像のダウンロード
   const link = document.createElement("a");
-  link.download = `${new Date().getTime()}.png`;
+  link.download = `MTG-Tile_${new Date().toISOString().slice(0,10)}_${Date.now()}.png`;
   link.href = canvas.toDataURL("image/png");
   link.click();
+
+  } finally {
+    // ローディング表示を解除
+    ui.generateBtn.disabled = false;
+    ui.generateBtn.textContent = originalText;
+  }
 });
 
 ui.clearBtn.addEventListener("click", () => {
