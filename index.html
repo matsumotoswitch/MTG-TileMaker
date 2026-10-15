@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MTG Card Tile Maker</title>
   <meta name="description" content="Scryfall APIを利用してMTGカード画像を検索し、タイル状のコラージュ画像をブラウザ上で作成できるWebツールです。" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20261014_3" />
 </head>
 <body>
   <main class="container">
@@ -106,6 +106,18 @@
     </div>
   </div>
 
+  <!-- 確認・通知モーダル -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 id="confirmModalTitle">確認</h3>
+      <p id="confirmModalMessage">配置したカードをすべて削除しますか？</p>
+      <div class="modal-actions">
+        <button id="confirmModalCancelBtn">キャンセル</button>
+        <button id="confirmModalOkBtn" class="danger-btn">削除する</button>
+      </div>
+    </div>
+  </div>
+
     <!-- テンプレート群 -->
     <template id="search-result-template">
       <div class="card-item" draggable="true">
@@ -135,7 +147,7 @@
     <template id="preview-card-template">
       <div class="canvas-card" draggable="true">
         <div class="img-wrapper">
-          <img class="preview-img" />
+          <img class="preview-img" crossorigin="anonymous" />
         </div>
         <button class="rotate-btn rotate-l" title="左に90度回転">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
@@ -147,6 +159,6 @@
       </div>
     </template>
 
-  <script src="main.js"></script>
+  <script src="main.js?v=20261014_3"></script>
 </body>
 </html>

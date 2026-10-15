@@ -128,6 +128,8 @@ function loadImage(url) {
 // APIリクエストを直列化して実行するためのキュー
 const apiQueue = [];
 let isApiProcessing = false;
+// 他言語版カード一覧のレスポンスキャッシュ（重複フェッチ防止）
+const printsCache = new Map();
 
 /**
  * Scryfall APIへのリクエストをキューに追加して実行
@@ -156,6 +158,11 @@ async function processApiQueue() {
       if (res.status === 429) {
         apiQueue.unshift({ url, resolve, reject });
         await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      // 404 (Not Found) の場合は検索結果0件として正常に空データを返す
+      if (res.status === 404) {
+        resolve({ data: [], has_more: false });
         continue;
       }
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
@@ -342,38 +349,36 @@ function createSearchResultCard(target, card) {
 
 // 他言語版の取得と言語切り替えボタンの設定
 function setupLanguageButtons(el, card, target) {
-  let printsUri = card.prints_search_uri;
-  // prints_search_uri はデフォルトで英語のみの場合があるため、lang:any を付与して全言語を取得可能にする
-  if (printsUri) {
-    try {
-      const u = new URL(printsUri);
-      const q = u.searchParams.get("q");
-      if (q) {
-        u.searchParams.set("q", q + " lang:any");
-        printsUri = u.toString();
-      }
-    } catch (e) { console.error(e); }
-  }
+  // そのカード（同セット・同コレクター番号）の他言語版のみをピンポイントで検索（高速・1リクエストで完結）
+  const cacheKey = `${card.set}_${card.collector_number}`;
+  const printsUri = `https://api.scryfall.com/cards/search?q=set:${encodeURIComponent(card.set)}+cn:%22${encodeURIComponent(card.collector_number)}%22+lang:any&unique=prints`;
 
-  fetchAllPrints(printsUri).then(printCards => {
+  const fetchPromise = printsCache.has(cacheKey)
+    ? Promise.resolve(printsCache.get(cacheKey))
+    : fetchScryfall(printsUri).then(data => {
+        const printCards = (data && data.data) ? data.data : [];
+        printsCache.set(cacheKey, printCards);
+        return printCards;
+      });
+
+  fetchPromise.then(printCards => {
     const langs = {};
     printCards.forEach(p => {
-      // 同じセット・同じコレクター番号のカード（同種カードの他言語版）をフィルタリング
-      if (p.set !== card.set) return;
-      if (p.collector_number !== card.collector_number) return;
-
       let pUrl = null;
+      let pName = p.name;
       if (target.faceIndex >= 0 && p.card_faces && p.card_faces[target.faceIndex]) {
         const f = p.card_faces[target.faceIndex];
         if (f.image_uris) pUrl = f.image_uris.png || f.image_uris.normal;
+        pName = f.printed_name || f.name;
       } else {
         pUrl = getCardImageUrl(p); // 通常カード
+        pName = p.printed_name || p.name;
       }
 
-      if (pUrl) langs[p.lang] = pUrl;
+      if (pUrl) langs[p.lang] = { url: pUrl, name: pName };
     });
-    renderLangButtons(el, langs, card.lang || "en");
-  });
+    renderLangButtons(el, langs, card.lang || "en", target);
+  }).catch(err => console.warn("他言語版の取得に失敗:", err));
 }
 
 // Scryfallのページネーションを処理して全データを取得する
@@ -392,7 +397,7 @@ async function fetchAllPrints(url) {
 }
 
 // 言語切り替えボタンのUI生成
-function renderLangButtons(el, langs, initialLang) {
+function renderLangButtons(el, langs, initialLang, target) {
   const langArea = el.querySelector(".langArea");
   const flagMap = { 
     ja: "JP", en: "EN", fr: "FR", de: "DE", es: "ES", it: "IT", pt: "PT", ru: "RU", ko: "KR", 
@@ -429,8 +434,15 @@ function renderLangButtons(el, langs, initialLang) {
     btn.addEventListener("mousedown", (e) => e.stopPropagation());
     btn.onclick = (e) => {
       e.stopPropagation();
-      if (langs[lang]) {
-        el.querySelector("img").src = langs[lang];
+      const item = langs[lang];
+      if (item) {
+        const cardImg = el.querySelector(".card-img");
+        cardImg.src = item.url;
+        target.imgUrl = item.url;
+        target.displayName = item.name;
+        const nameEl = el.querySelector(".name");
+        nameEl.textContent = item.name;
+        nameEl.title = item.name;
         currentLang = lang;
         updateHighlight();
       }
@@ -465,8 +477,11 @@ ui.dropArea.addEventListener("drop", (e) => {
   const json = e.dataTransfer.getData("application/json");
   if (json && !e.dataTransfer.getData("text/reorder-idx")) {
     const { url, w, h } = JSON.parse(json);
-    if (!baseImageSize) baseImageSize = { w: Number(w), h: Number(h) };
-    droppedCards.push({ url, rotation: 0 });
+    const cardW = Number(w) || 488;
+    const cardH = Number(h) || 680;
+    const cardRatio = cardH / cardW;
+    if (!baseImageSize) baseImageSize = { w: cardW, h: cardH };
+    droppedCards.push({ url, rotation: 0, w: cardW, h: cardH, ratio: cardRatio });
     renderDropPreview();
     updateSizeInfo();
   }
@@ -496,9 +511,12 @@ async function handleFiles(files) {
       const processedUrl = await processRoundCorners(rawUrl);
       const img = await loadImage(processedUrl);
 
-      if (!baseImageSize) baseImageSize = { w: img.naturalWidth, h: img.naturalHeight };
+      const cardW = img.naturalWidth || 488;
+      const cardH = img.naturalHeight || 680;
+      const cardRatio = cardH / cardW;
+      if (!baseImageSize) baseImageSize = { w: cardW, h: cardH };
       
-      droppedCards.push({ url: processedUrl, rotation: 0 });
+      droppedCards.push({ url: processedUrl, rotation: 0, w: cardW, h: cardH, ratio: cardRatio });
     } catch (err) {
       console.error("画像の読み込みに失敗しました:", err);
     }
@@ -613,7 +631,7 @@ function calculateLayout() {
   const gap = parseInt(ui.settings.gap.value) || 0;
   const userTotalWidth = parseInt(ui.settings.totalWidth.value) || 0;
   const align = ui.settings.align.value;
-  const ratio = baseImageSize.h / baseImageSize.w;
+  const defaultRatio = baseImageSize ? baseImageSize.h / baseImageSize.w : 1.4;
 
   // カードリストを指定列数で分割して行を作成
   const cardRows = [];
@@ -629,12 +647,13 @@ function calculateLayout() {
       // 90度回転している場合、幅と高さの比率を入れ替えて計算する
       // 通常: 幅=cardWidth, 高さ=cardWidth*ratio
       // 回転: 幅=cardWidth*ratio, 高さ=cardWidth
+      const cardRatio = card.ratio || defaultRatio;
       const isRotated = (card.rotation / 90) % 2 !== 0;
-      const w = Math.round(isRotated ? cardWidth * ratio : cardWidth);
-      const h = Math.round(isRotated ? cardWidth : cardWidth * ratio);
+      const w = Math.round(isRotated ? cardWidth * cardRatio : cardWidth);
+      const h = Math.round(isRotated ? cardWidth : cardWidth * cardRatio);
       rowW += w;
       rowH = Math.max(rowH, h);
-      return { w, h, rotation: card.rotation, url: card.url };
+      return { w, h, rotation: card.rotation, url: card.url, ratio: cardRatio };
     });
     rowW += Math.max(0, items.length - 1) * gap;
     maxWidth = Math.max(maxWidth, rowW);
@@ -767,8 +786,12 @@ function createPreviewCard(cardData, idx) {
       // 新規ドロップ
       const json = e.dataTransfer.getData("application/json");
       if (json) {
-        const { url } = JSON.parse(json);
-        droppedCards.splice(insertAt, 0, { url, rotation: 0 });
+        const { url, w, h } = JSON.parse(json);
+        const cardW = Number(w) || 488;
+        const cardH = Number(h) || 680;
+        const cardRatio = cardH / cardW;
+        if (!baseImageSize) baseImageSize = { w: cardW, h: cardH };
+        droppedCards.splice(insertAt, 0, { url, rotation: 0, w: cardW, h: cardH, ratio: cardRatio });
         renderDropPreview(); updateSizeInfo();
       }
     }
@@ -779,6 +802,9 @@ function createPreviewCard(cardData, idx) {
   card.querySelector(".remove-btn").onclick = (e) => {
     e.stopPropagation();
     droppedCards.splice(idx, 1);
+    if (droppedCards.length === 0) {
+      baseImageSize = null;
+    }
     renderDropPreview(); updateSizeInfo();
   };
 
@@ -811,28 +837,28 @@ ui.generateBtn.addEventListener("click", async () => {
   ui.generateBtn.textContent = "生成中...";
 
   try {
-  // 高解像度画像を順次取得（サーバー負荷軽減のため遅延を入れる）
-  const imgs = [];
-  for (const c of droppedCards) {
-    try {
-      imgs.push(await loadImage(c.url));
-    } catch (e) {
-      console.warn("画像のロードをスキップ:", c.url);
-      imgs.push(null);
-    }
-    await new Promise(r => setTimeout(r, getRandomDelay()));
-  }
+    // 高解像度画像を並列取得（高速化）
+    const imgs = await Promise.all(
+      droppedCards.map(c => loadImage(c.url).catch(e => {
+        console.warn("画像のロードをスキップ:", c.url, e);
+        return null;
+      }))
+    );
   
-  // Canvasの作成
-  const canvas = document.createElement("canvas");
-  canvas.width = finalCanvasWidth;
-  canvas.height = totalHeight;
-  const ctx = canvas.getContext("2d");
+    // Canvasの作成
+    const canvas = document.createElement("canvas");
+    canvas.width = finalCanvasWidth;
+    canvas.height = totalHeight;
+    const ctx = canvas.getContext("2d");
 
-  let currentY = 0;
-  rows.forEach((row, rowIdx) => {
-    // 行ごとの配置開始X座標（左揃え、中央揃え、右揃え）
-    let currentX = (align === "center") ? (finalCanvasWidth - row.width) / 2 : (align === "right") ? (finalCanvasWidth - row.width) : 0;
+    let currentY = 0;
+    rows.forEach((row, rowIdx) => {
+      // 行ごとの配置開始X座標（左揃え、中央揃え、右揃え、はみ出し時は0に制限）
+      let currentX = (align === "center") 
+        ? Math.max(0, (finalCanvasWidth - row.width) / 2) 
+        : (align === "right") 
+          ? Math.max(0, finalCanvasWidth - row.width) 
+          : 0;
     
     row.items.forEach((item, itemIdx) => {
       const cardIdx = rowIdx * settings.columns + itemIdx;
@@ -874,14 +900,96 @@ ui.generateBtn.addEventListener("click", async () => {
   }
 });
 
-ui.clearBtn.addEventListener("click", () => {
-  if (droppedCards.length === 0) return;
-  if (!confirm("配置したカードをすべて削除しますか？")) return;
+/**
+ * カスタム確認・通知モーダル（ブラウザのalert/confirmに依存しない）
+ * @param {Object} options
+ * @param {string} options.title - モーダル見出し
+ * @param {string} options.message - メッセージ本文
+ * @param {string} [options.okText='OK'] - 確定ボタンのテキスト
+ * @param {string|null} [options.cancelText='キャンセル'] - キャンセルボタンのテキスト（nullの場合は非表示）
+ * @param {boolean} [options.isDanger=false] - 確定ボタンを危険色（赤）にするか
+ * @returns {Promise<boolean>} OKが押されたらtrue、キャンセルや外側クリックはfalse
+ */
+function showCustomModal({ title, message, okText = "OK", cancelText = "キャンセル", isDanger = false }) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirmModal");
+    const titleEl = document.getElementById("confirmModalTitle");
+    const messageEl = document.getElementById("confirmModalMessage");
+    const okBtn = document.getElementById("confirmModalOkBtn");
+    const cancelBtn = document.getElementById("confirmModalCancelBtn");
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    okBtn.textContent = okText;
+    okBtn.className = isDanger ? "danger-btn" : "primary-btn";
+
+    if (cancelText) {
+      cancelBtn.style.display = "block";
+      cancelBtn.textContent = cancelText;
+    } else {
+      cancelBtn.style.display = "none";
+    }
+
+    modal.classList.add("show");
+
+    const cleanup = () => {
+      modal.classList.remove("show");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      modal.removeEventListener("click", onOverlay);
+    };
+
+    const onOk = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const onOverlay = (e) => {
+      if (e.target === modal) {
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    modal.addEventListener("click", onOverlay);
+  });
+}
+
+ui.clearBtn.addEventListener("click", async () => {
+  if (droppedCards.length === 0) {
+    await showCustomModal({
+      title: "お知らせ",
+      message: "キャンバスに配置されたカードがありません。",
+      okText: "閉じる",
+      cancelText: null,
+      isDanger: false
+    });
+    return;
+  }
+
+  const confirmed = await showCustomModal({
+    title: "キャンバスのクリア",
+    message: "キャンバスに配置したカードをすべて削除しますか？",
+    okText: "削除する",
+    cancelText: "キャンセル",
+    isDanger: true
+  });
+
+  if (!confirmed) return;
+
   droppedCards = [];
   baseImageSize = null;
   renderDropPreview();
   updateSizeInfo();
 });
+
 
 // 出力予定サイズの情報を更新して表示する
 function updateSizeInfo() {
