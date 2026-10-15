@@ -435,16 +435,64 @@ function renderLangButtons(el, langs, initialLang, target) {
     btn.onclick = (e) => {
       e.stopPropagation();
       const item = langs[lang];
-      if (item) {
-        const cardImg = el.querySelector(".card-img");
-        cardImg.src = item.url;
-        target.imgUrl = item.url;
-        target.displayName = item.name;
-        const nameEl = el.querySelector(".name");
+      if (!item) return;
+
+      const cardImg = el.querySelector(".card-img");
+      if (!cardImg) return;
+
+      // すでに同じ言語かつ同じURLが表示されている場合はスキップ
+      if (currentLang === lang && cardImg.src === item.url) return;
+
+      currentLang = lang;
+      updateHighlight();
+
+      // ロード中エフェクトをカードに付与
+      el.classList.add("is-loading");
+
+      const startTime = Date.now();
+      const MIN_LOADING_TIME = 200; // チラつき防止およびエフェクト視認のための最小表示時間(ms)
+
+      // 連続切り替え時の競合防止用ID
+      const loadId = (cardImg._loadId = (cardImg._loadId || 0) + 1);
+
+      const onComplete = () => {
+        if (cardImg._loadId !== loadId) return;
+
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, MIN_LOADING_TIME - elapsed);
+
+        setTimeout(() => {
+          if (cardImg._loadId !== loadId) return;
+          el.classList.remove("is-loading");
+
+          // 読み込み完了後に画像本来のサイズを取得・更新
+          if (cardImg.naturalWidth && cardImg.naturalHeight) {
+            el.dataset.w = cardImg.naturalWidth;
+            el.dataset.h = cardImg.naturalHeight;
+            const sizeEl = el.querySelector(".size");
+            if (sizeEl) {
+              sizeEl.textContent = `${cardImg.naturalWidth}×${cardImg.naturalHeight}px`;
+            }
+          }
+        }, remaining);
+      };
+
+      cardImg.addEventListener("load", onComplete, { once: true });
+      cardImg.addEventListener("error", () => {
+        if (cardImg._loadId !== loadId) return;
+        console.warn("カード画像の読み込みに失敗しました:", item.url);
+        onComplete();
+      }, { once: true });
+
+      // 新しい画像URLを設定してロード開始
+      cardImg.src = item.url;
+      target.imgUrl = item.url;
+      target.displayName = item.name;
+
+      const nameEl = el.querySelector(".name");
+      if (nameEl) {
         nameEl.textContent = item.name;
         nameEl.title = item.name;
-        currentLang = lang;
-        updateHighlight();
       }
     };
     langArea.appendChild(btn);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MTG Card Tile Maker</title>
   <meta name="description" content="Scryfall APIを利用してMTGカード画像を検索し、タイル状のコラージュ画像をブラウザ上で作成できるWebツールです。" />
-  <link rel="stylesheet" href="style.css?v=20261014_3" />
+  <link rel="stylesheet" href="style.css?v=20261015_2" />
 </head>
 <body>
   <main class="container">
@@ -122,6 +122,10 @@
     <template id="search-result-template">
       <div class="card-item" draggable="true">
         <img class="card-img" crossorigin="anonymous" />
+        <div class="card-img-loader">
+          <div class="card-spinner"></div>
+          <span class="card-loader-text">LOADING...</span>
+        </div>
         <div class="card-overlay">
           <div class="name-row">
             <a class="card-link gatherer-link" target="_blank" title="Gathererで検索">
@@ -159,6 +163,6 @@
       </div>
     </template>
 
-  <script src="main.js?v=20261014_3"></script>
+  <script src="main.js?v=20261015_2"></script>
 </body>
 </html>
