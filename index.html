@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MTG Card Tile Maker</title>
   <meta name="description" content="Scryfall APIを利用してMTGカード画像を検索し、タイル状のコラージュ画像をブラウザ上で作成できるWebツールです。" />
-  <link rel="stylesheet" href="style.css?v=20261015_2" />
+  <link rel="stylesheet" href="style.css?v=20261015_3" />
 </head>
 <body>
   <main class="container">
@@ -102,7 +102,9 @@
       <p>
         カードデータおよび画像は <a href="https://scryfall.com/" target="_blank">Scryfall</a> によって提供されています。
       </p>
-      <button id="closeModalBtn">閉じる</button>
+      <div class="modal-actions">
+        <button id="closeModalBtn" class="primary-btn">閉じる</button>
+      </div>
     </div>
   </div>
 
@@ -163,6 +165,6 @@
       </div>
     </template>
 
-  <script src="main.js?v=20261015_2"></script>
+  <script src="main.js?v=20261015_3"></script>
 </body>
 </html>

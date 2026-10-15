@@ -985,6 +985,7 @@ function showCustomModal({ title, message, okText = "OK", cancelText = "キャ�
       okBtn.removeEventListener("click", onOk);
       cancelBtn.removeEventListener("click", onCancel);
       modal.removeEventListener("click", onOverlay);
+      window.removeEventListener("keydown", onKeyDown);
     };
 
     const onOk = () => {
@@ -1004,9 +1005,18 @@ function showCustomModal({ title, message, okText = "OK", cancelText = "キャ�
       }
     };
 
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup();
+        resolve(false);
+      }
+    };
+
     okBtn.addEventListener("click", onOk);
     cancelBtn.addEventListener("click", onCancel);
     modal.addEventListener("click", onOverlay);
+    window.addEventListener("keydown", onKeyDown);
   });
 }
 
@@ -1068,3 +1078,9 @@ ui.infoModal.addEventListener("click", (e) => {
     ui.infoModal.classList.remove("show");
   }
 });
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && ui.infoModal.classList.contains("show")) {
+    ui.infoModal.classList.remove("show");
+  }
+});
+
