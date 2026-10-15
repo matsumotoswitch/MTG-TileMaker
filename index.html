@@ -25,7 +25,7 @@
   <meta name="twitter:description" content="Scryfall APIを利用してMTGカード画像を検索し、タイル状のコラージュ画像をブラウザ上で作成できるWebツールです。" />
   <meta name="twitter:image" content="https://matsumotoswitch.github.io/MTG-TileMaker/ogp-image.jpg" />
 
-  <link rel="stylesheet" href="style.css?v=20261015_3" />
+  <link rel="stylesheet" href="style.css?v=20261016_2" />
 </head>
 <body>
   <main class="container">
@@ -165,7 +165,13 @@
           <div class="size"></div>
         </div>
         <div class="card-footer">
+          <button class="lang-scroll-btn lang-scroll-left" title="前の言語へ" aria-label="前の言語へ" tabindex="-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
           <div class="langArea"></div>
+          <button class="lang-scroll-btn lang-scroll-right" title="次の言語へ" aria-label="次の言語へ" tabindex="-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
         </div>
       </div>
     </template>
@@ -185,6 +191,6 @@
       </div>
     </template>
 
-  <script src="main.js?v=20261015_3"></script>
+  <script src="main.js?v=20261016_4"></script>
 </body>
 </html>

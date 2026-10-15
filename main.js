@@ -132,13 +132,29 @@ let isApiProcessing = false;
 const printsCache = new Map();
 
 /**
+ * 進行中の低優先度APIキューを全て破棄する（新しい検索が開始された時など）
+ */
+function clearApiQueue() {
+  while (apiQueue.length > 0) {
+    const item = apiQueue.shift();
+    item.reject(new Error("Canceled by new search"));
+  }
+}
+
+/**
  * Scryfall APIへのリクエストをキューに追加して実行
  * @param {string} url
+ * @param {boolean} [priority=false] 最優先で実行するかどうか
  * @returns {Promise<Object>}
  */
-function fetchScryfall(url) {
+function fetchScryfall(url, priority = false) {
   return new Promise((resolve, reject) => {
-    apiQueue.push({ url, resolve, reject });
+    const item = { url, resolve, reject, retries: 0 };
+    if (priority) {
+      apiQueue.unshift(item);
+    } else {
+      apiQueue.push(item);
+    }
     processApiQueue();
   });
 }
@@ -150,30 +166,41 @@ async function processApiQueue() {
   if (isApiProcessing) return;
   isApiProcessing = true;
 
-  while (apiQueue.length > 0) {
-    const { url, resolve, reject } = apiQueue.shift();
-    try {
-      const res = await fetch(url);
-      // レート制限(429)の場合はリトライ
-      if (res.status === 429) {
-        apiQueue.unshift({ url, resolve, reject });
-        await new Promise(r => setTimeout(r, 1000));
-        continue;
+  try {
+    while (apiQueue.length > 0) {
+      const item = apiQueue.shift();
+      const { url, resolve, reject } = item;
+      try {
+        const res = await fetch(url);
+        // レート制限(429)の場合はリトライ
+        if (res.status === 429) {
+          apiQueue.unshift(item);
+          await new Promise(r => setTimeout(r, 1200));
+          continue;
+        }
+        // 404 (Not Found) の場合は検索結果0件として正常に空データを返す
+        if (res.status === 404) {
+          resolve({ data: [], has_more: false });
+          continue;
+        }
+        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+        const data = await res.json();
+        resolve(data);
+      } catch (e) {
+        // ネットワーク一時エラーの場合は最大2回リトライ
+        if (item.retries < 2 && e.message !== "Canceled by new search") {
+          item.retries++;
+          apiQueue.unshift(item);
+          await new Promise(r => setTimeout(r, 800));
+          continue;
+        }
+        reject(e);
       }
-      // 404 (Not Found) の場合は検索結果0件として正常に空データを返す
-      if (res.status === 404) {
-        resolve({ data: [], has_more: false });
-        continue;
-      }
-      if (!res.ok) throw new Error(`API Error: ${res.status}`);
-      const data = await res.json();
-      resolve(data);
-    } catch (e) {
-      reject(e);
+      await new Promise(r => setTimeout(r, getRandomDelay()));
     }
-    await new Promise(r => setTimeout(r, getRandomDelay()));
+  } finally {
+    isApiProcessing = false;
   }
-  isApiProcessing = false;
 }
 
 // 検索入力欄でEnterキーが押されたら検索を実行
@@ -186,6 +213,9 @@ ui.searchBtn.addEventListener("click", async () => {
   const query = ui.searchInput.value.trim();
   const match = document.querySelector('input[name="match"]:checked').value;
   if (!query) return;
+
+  // 新しい検索を行うため、前の検索でキューに溜まっている未処理の他言語版リクエストを破棄
+  clearApiQueue();
 
   const lang = detectLang(query);
   // Scryfall検索構文: 完全一致の場合は "!" を付与、langパラメータで言語指定
@@ -201,7 +231,8 @@ ui.searchBtn.addEventListener("click", async () => {
     let allCards = [];
     let pageCount = 0;
     while (url && pageCount < MAX_PAGES) {
-      const data = await fetchScryfall(url);
+      // ユーザーのメイン検索は最優先で即時実行
+      const data = await fetchScryfall(url, true);
       if (!data.data) break;
       allCards = allCards.concat(data.data);
       url = data.has_more ? data.next_page : null;
@@ -219,7 +250,10 @@ ui.searchBtn.addEventListener("click", async () => {
       addCardResult(card, query);
     });
   } catch (e) {
-    ui.results.innerHTML = "<p class='search-message error'>検索エラーが発生しました</p>";
+    if (e.message !== "Canceled by new search") {
+      console.error("Search failed:", e);
+      ui.results.innerHTML = "<p class='search-message error'>検索エラーが発生しました</p>";
+    }
   }
 });
 
@@ -399,6 +433,9 @@ async function fetchAllPrints(url) {
 // 言語切り替えボタンのUI生成
 function renderLangButtons(el, langs, initialLang, target) {
   const langArea = el.querySelector(".langArea");
+  const leftBtn = el.querySelector(".lang-scroll-left");
+  const rightBtn = el.querySelector(".lang-scroll-right");
+
   const flagMap = { 
     ja: "JP", en: "EN", fr: "FR", de: "DE", es: "ES", it: "IT", pt: "PT", ru: "RU", ko: "KR", 
     zhs: "CN", zht: "TW", ph: "Φ", he: "HE", la: "LA", grc: "GR", ar: "AR", sa: "SA" 
@@ -408,7 +445,45 @@ function renderLangButtons(el, langs, initialLang, target) {
 
   langArea.innerHTML = ""; // クリア
 
-  // 横スクロール操作の補助
+  // スクロールボタンの表示・非表示判定
+  const updateScrollButtons = () => {
+    if (!leftBtn || !rightBtn) return;
+    const maxScroll = langArea.scrollWidth - langArea.clientWidth;
+    if (maxScroll > 1) {
+      leftBtn.classList.toggle("visible", langArea.scrollLeft > 2);
+      rightBtn.classList.toggle("visible", langArea.scrollLeft < maxScroll - 2);
+    } else {
+      leftBtn.classList.remove("visible");
+      rightBtn.classList.remove("visible");
+    }
+  };
+
+  langArea.addEventListener("scroll", updateScrollButtons, { passive: true });
+
+  if (leftBtn) {
+    leftBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+    leftBtn.onclick = (e) => {
+      e.stopPropagation();
+      langArea.scrollBy({ left: -60, behavior: "smooth" });
+    };
+  }
+
+  if (rightBtn) {
+    rightBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+    rightBtn.onclick = (e) => {
+      e.stopPropagation();
+      langArea.scrollBy({ left: 60, behavior: "smooth" });
+    };
+  }
+
+  // 要素サイズ変更時や表示完了時にもスクロール状態を再評価
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => updateScrollButtons());
+    ro.observe(langArea);
+  }
+  requestAnimationFrame(updateScrollButtons);
+
+  // 横スクロール操作の補助（マウスホイール）
   langArea.addEventListener("wheel", (e) => {
     if (e.deltaY) {
       e.preventDefault();
@@ -418,9 +493,20 @@ function renderLangButtons(el, langs, initialLang, target) {
 
   let currentLang = initialLang && langs[initialLang] ? initialLang : keys[0];
 
-  const updateHighlight = () => {
+  const updateHighlight = (scrollIntoContainer = false) => {
     langArea.querySelectorAll(".langBtn").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.lang === currentLang);
+      const isActive = btn.dataset.lang === currentLang;
+      btn.classList.toggle("active", isActive);
+      if (isActive && scrollIntoContainer) {
+        // scrollIntoViewは祖先やページ全体をスクロールさせてしまうため、langAreaコンテナ内限定でスクロール
+        const cRect = langArea.getBoundingClientRect();
+        const bRect = btn.getBoundingClientRect();
+        if (bRect.left < cRect.left) {
+          langArea.scrollBy({ left: bRect.left - cRect.left - 4, behavior: "smooth" });
+        } else if (bRect.right > cRect.right) {
+          langArea.scrollBy({ left: bRect.right - cRect.right + 4, behavior: "smooth" });
+        }
+      }
     });
   };
 
@@ -444,7 +530,7 @@ function renderLangButtons(el, langs, initialLang, target) {
       if (currentLang === lang && cardImg.src === item.url) return;
 
       currentLang = lang;
-      updateHighlight();
+      updateHighlight(true);
 
       // ロード中エフェクトをカードに付与
       el.classList.add("is-loading");
@@ -498,7 +584,7 @@ function renderLangButtons(el, langs, initialLang, target) {
     langArea.appendChild(btn);
   });
   
-  updateHighlight();
+  updateHighlight(false);
 }
 
 ui.dropArea.addEventListener("dragover", (e) => {

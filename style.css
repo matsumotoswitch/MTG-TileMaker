@@ -475,8 +475,9 @@ select {
   background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 0;
   pointer-events: auto; /* フッター内の操作は許可 */
+  overflow: hidden;
 }
 
 .card-link {
@@ -632,18 +633,73 @@ select {
    ========================================================================== */
 .langArea {
   display: flex;
-  flex: 1; /* 残りの幅を埋める */
-  margin-left: 8px;
+  flex: 1;
+  height: 100%;
+  padding: 0 6px;
   gap: 4px;
   overflow-x: auto; /* 横スクロール可能に */
   scrollbar-width: none; /* Firefox用スクロールバー非表示 */
   -ms-overflow-style: none; /* IE/Edge用 */
   align-items: center;
   pointer-events: auto;
+  scroll-behavior: smooth;
 }
 /* Chrome/Safari用スクロールバー非表示 */
 .langArea::-webkit-scrollbar {
   display: none;
+}
+
+/* 言語スクロールナビゲーションボタン（言語チップと同じ高さ・縦位置で揃える） */
+.lang-scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 18px;
+  width: 18px;
+  background: #222;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #ffd700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.lang-scroll-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lang-scroll-btn.lang-scroll-left {
+  left: 2px;
+}
+
+.lang-scroll-btn.lang-scroll-right {
+  right: 2px;
+}
+
+.lang-scroll-btn:hover {
+  background: #444;
+  color: #ffffff;
+  border-color: #ffd700;
+  filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.7));
+}
+
+.lang-scroll-btn:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+.lang-scroll-btn svg {
+  pointer-events: none;
+  flex-shrink: 0;
 }
 
 .langBtn {
@@ -651,7 +707,9 @@ select {
   color: #ccc;
   border: 1px solid #555;
   border-radius: 3px;
-  padding: 2px 4px;
+  padding: 0 4px;
+  height: 18px;
+  box-sizing: border-box;
   font-size: 10px;
   cursor: pointer;
   min-width: 24px;
@@ -660,6 +718,9 @@ select {
   font-weight: bold;
   transition: all 0.1s;
   pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .langBtn:hover {
